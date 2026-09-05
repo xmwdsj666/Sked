@@ -1,6 +1,6 @@
 {
-  "package": "com.qwq.timetable",
-  "name": "高中课表",
+  "package": "com.qwq.sked",
+  "name": "Sked",
   "versionName": "1.0.0",
   "versionCode": 1,
   "minPlatformVersion": 1070,

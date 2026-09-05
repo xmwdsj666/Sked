@@ -30,7 +30,7 @@
           <text class="card-title-danger">恢复默认数据</text>
         </div>
 
-        <text class="about">高中课表 v1.0.0 · BlueOS</text>
+        <text class="about">Sked v1.0.0 · BlueOS</text>
         <div class="gap"></div>
       </div>
     </scroll>

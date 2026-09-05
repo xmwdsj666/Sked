@@ -1,8 +1,8 @@
 {
-  "name": "blueos-timetable",
+  "name": "sked",
   "version": "1.0.0",
   "private": true,
-  "description": "BlueOS 手表高中课表应用",
+  "description": "Sked — BlueOS 手表课表应用",
   "scripts": {
     "test": "node --test tests/timetable.test.mjs"
   },

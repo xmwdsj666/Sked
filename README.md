@@ -1,4 +1,4 @@
-# 高中课表 · BlueOS 手表应用
+# Sked — BlueOS 手表课表应用
 
 为 vivo BlueOS（蓝河 OS）圆屏手表打造的高中生课表应用。iOS 深色质感，纯本地离线运行。
 
@@ -18,7 +18,7 @@
 
 ## 快速开始（BlueOS Studio 模拟器）
 
-1. 打开 BlueOS Studio → `文件 → 打开文件夹` → 选择本目录 `blueos-timetable`。
+1. 打开 BlueOS Studio → `文件 → 打开文件夹` → 选择本目录 `Sked`。
 2. 首次打开点预览区「安装依赖」（或终端执行 `pnpm i` / `npm i`；官方推荐 pnpm）。
 3. 按 `Ctrl+Shift+R` 重新启动编译 → 模拟器实时预览（Watch 模板内置模拟器，无需真机）。
 4. 修改代码保存后自动增量编译；`Ctrl+R` 仅重新编译。
