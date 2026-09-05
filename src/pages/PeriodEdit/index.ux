@@ -9,15 +9,7 @@
           <text class="head-title">编辑时段</text>
         </div>
 
-        <text class="ed-label">名称</text>
-        <picker class="ed-picker" type="text" range="{{nameRange}}" selected="{{nameSel}}" onchange="onNamePick"></picker>
-
-        <text class="ed-label">开始时间</text>
-        <picker class="ed-picker" type="time" format="HH:mm" selected="{{pStart}}" onchange="onStartPick"></picker>
-
-        <text class="ed-label">结束时间</text>
-        <picker class="ed-picker" type="time" format="HH:mm" selected="{{pEnd}}" onchange="onEndPick"></picker>
-
+        <!-- 类型置顶：始终可见可点 -->
         <text class="ed-label">类型</text>
         <div class="pills">
           <div class="pill {{pType === 'class' ? 'pill-on' : ''}}" onclick="onKindClass">
@@ -27,6 +19,15 @@
             <text class="pill-txt {{pType === 'break' ? 'pill-txt-on' : ''}}">休息</text>
           </div>
         </div>
+
+        <text class="ed-label">名称</text>
+        <picker class="ed-picker" type="text" range="{{nameRange}}" selected="{{nameSel}}" loop="true" onchange="onNamePick"></picker>
+
+        <text class="ed-label">开始时间</text>
+        <picker class="ed-picker" type="time" format="HH:mm" selected="{{pStart}}" loop="true" onchange="onStartPick"></picker>
+
+        <text class="ed-label">结束时间</text>
+        <picker class="ed-picker" type="time" format="HH:mm" selected="{{pEnd}}" loop="true" onchange="onEndPick"></picker>
 
         <div class="save-btn press" onclick="onSave">
           <text class="save-txt">保存</text>
@@ -257,7 +258,7 @@ export default {
   color: rgba(235, 235, 245, 0.4);
   selected-font-size: 30px;
   selected-color: #ffffff;
-  selected-background-color: rgba(10, 132, 255, 0.15);
+  selected-background-color: rgba(255, 255, 255, 0.08);
   linecolor: #26262c;
 }
 
