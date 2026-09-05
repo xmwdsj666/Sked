@@ -1,0 +1,596 @@
+<template>
+  <div class="page">
+    <scroll class="scroll" scroll-y="true">
+      <div class="content">
+        <text class="title">编辑课表</text>
+
+        <!-- 星期切换条：‹ 周五 › -->
+        <div class="day-bar">
+          <div class="arrow press" onclick="onPrevDay">
+            <text class="arrow-txt">‹</text>
+          </div>
+          <text class="day-name">{{dayLabel}}</text>
+          <div class="arrow press" onclick="onNextDay">
+            <text class="arrow-txt">›</text>
+          </div>
+        </div>
+
+        <!-- 课程行：第N节 + 科目，点击行弹出选择课程面板 -->
+        <div class="list">
+          <div for="{{row in rows}}" tid="{{row.key}}" class="crow press" onclick="onRowTap($idx)" style="background-color: {{row.bg}};">
+            <text class="crow-period">{{row.pname}}</text>
+            <text class="crow-subj {{row.has ? '' : 'crow-subj-none'}}">{{row.subjName}}</text>
+            <div class="crow-pad"></div>
+          </div>
+
+          <div if="{{rows.length === 0}}" class="empty">
+            <text class="empty-txt">没有课时时段，先去「设置 · 作息时间」添加</text>
+          </div>
+        </div>
+
+        <div class="gap"></div>
+      </div>
+    </scroll>
+
+    <!-- 选择课程面板（底部覆盖层，图二样式） -->
+    <div if="{{panelShow}}" class="mask">
+      <div class="panel">
+        <div class="panel-head">
+          <div class="back press" onclick="onPanelClose">
+            <text class="back-txt">‹</text>
+          </div>
+          <text class="panel-title">选择课程</text>
+          <text class="panel-cur">{{curName}}</text>
+        </div>
+
+        <scroll class="subj-scroll" scroll-y="true">
+          <text class="sec-label">预设科目</text>
+          <div class="subj-grid">
+            <div for="{{s in presetBtns}}" tid="{{s.key}}" class="subj-btn press {{s.name === curName ? 'subj-btn-on' : ''}}" onclick="onPickSubject($idx)">
+              <text class="subj-txt">{{s.name}}</text>
+            </div>
+          </div>
+
+          <text class="sec-label">自定义课程</text>
+          <div class="subj-grid">
+            <div for="{{s in customBtns}}" tid="{{s.key}}" class="subj-btn press {{s.name === curName ? 'subj-btn-on' : ''}}" onclick="onPickSubject($idx)">
+              <text class="subj-txt">{{s.name}}</text>
+            </div>
+          </div>
+
+          <!-- 新增自定义：输入框 + 确定 -->
+          <div class="add-box">
+            <input class="add-input" type="text" placeholder="输入课程名" value="{{inputVal}}" onchange="onInputChange"></input>
+            <div class="add-ok press" onclick="onCustomAdd">
+              <text class="add-ok-txt">确定</text>
+            </div>
+          </div>
+        </scroll>
+
+        <div class="clear-btn press" onclick="onClearSlot">
+          <text class="clear-txt">清空当前</text>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script>
+import sys from '../../helper/sys.js'
+import { load, getData, save } from '../../store/index.js'
+import { WEEKDAY_ZH, CUSTOM_COLORS, genId } from '../../core/defaults.js'
+
+export default {
+  data: {
+    selDay: -1,
+    dayLabel: '周一',
+    rows: [],
+    panelShow: false,
+    presetBtns: [],
+    customBtns: [],
+    curName: '',
+    inputVal: '',
+    activePid: '',
+    day: ''
+  },
+
+  onInit() {
+    this._loaded = false
+    if (this.day !== undefined && this.day !== '') {
+      const d = parseInt(this.day, 10)
+      if (!isNaN(d) && d >= 0 && d <= 6) this.selDay = d
+    }
+  },
+
+  onReady() {
+    this._loaded = true
+    load()
+    this.refresh()
+  },
+
+  onShow() {
+    if (this._loaded) this.refresh()
+  },
+
+  refresh() {
+    if (!this._loaded) return
+    const st = getData()
+    if (!st) return
+    if (this.selDay < 0) {
+      const now = new Date()
+      this.selDay = (now.getDay() + 6) % 7
+    }
+    this.dayLabel = WEEKDAY_ZH[this.selDay]
+
+    // 科目按钮（预设 + 自定义，自定义 = 标记 custom 的条目）
+    const preset = []
+    const custom = []
+    for (let i = 0; i < st.subjects.length; i++) {
+      const s = st.subjects[i]
+      const btn = { key: s.id, name: s.name, color: s.color }
+      if (s.custom) custom.push(btn)
+      else preset.push(btn)
+    }
+    this.presetBtns = preset
+    this.customBtns = custom
+
+    // 当天课时行（第1节起连续编号）
+    const dayNo = this.selDay + 1
+    const dayList = (st.courses && st.courses[String(dayNo)]) || []
+    const periods = (st.periods || []).slice().sort(function (a, b) { return a.start < b.start ? -1 : 1 })
+    const subjMap = {}
+    for (let i = 0; i < st.subjects.length; i++) subjMap[st.subjects[i].id] = st.subjects[i]
+    const rows = []
+    let n = 0
+    for (let i = 0; i < periods.length; i++) {
+      const p = periods[i]
+      if (p.type !== 'class') continue
+      n++
+      let course = null
+      for (let j = 0; j < dayList.length; j++) {
+        if (dayList[j] && dayList[j].periodId === p.id) { course = dayList[j]; break }
+      }
+      const subj = course ? subjMap[course.subjectId] : null
+      rows.push({
+        key: p.id,
+        pid: p.id,
+        pname: '第' + n + '节',
+        subjName: subj ? subj.name : '未设置',
+        has: !!subj,
+        bg: subj ? subj.color + '2E' : '#232327'
+      })
+    }
+    this.rows = rows
+  },
+
+  syncCurName() {
+    const st = getData()
+    if (!st) return
+    let course = null
+    const dayNo = String(this.selDay + 1)
+    const dayList = (st.courses && st.courses[dayNo]) || []
+    for (let j = 0; j < dayList.length; j++) {
+      if (dayList[j] && dayList[j].periodId === this.activePid) { course = dayList[j]; break }
+    }
+    if (!course) { this.curName = ''; return }
+    for (let i = 0; i < st.subjects.length; i++) {
+      if (st.subjects[i].id === course.subjectId) { this.curName = st.subjects[i].name; return }
+    }
+    this.curName = ''
+  },
+
+  onPrevDay() {
+    this.selDay = (this.selDay + 6) % 7
+    sys.vibrateShort()
+    this.refresh()
+  },
+
+  onNextDay() {
+    this.selDay = (this.selDay + 1) % 7
+    sys.vibrateShort()
+    this.refresh()
+  },
+
+  onRowTap(idx) {
+    if (idx === undefined || !this.rows[idx]) return
+    this.activePid = this.rows[idx].pid
+    this.inputVal = ''
+    this.syncCurName()
+    this.panelShow = true
+    sys.vibrateShort()
+  },
+
+  onPanelClose() {
+    this.panelShow = false
+  },
+
+  onPickSubject(idx) {
+    const all = this.presetBtns.concat(this.customBtns)
+    const btn = all[idx]
+    if (!btn) return
+    const st = getData()
+    if (!st) return
+    const dayNo = String(this.selDay + 1)
+    const slot = st.courses[dayNo] || (st.courses[dayNo] = [])
+    for (let i = slot.length - 1; i >= 0; i--) {
+      if (slot[i].periodId === this.activePid) slot.splice(i, 1)
+    }
+    slot.push({ subjectId: btn.key, periodId: this.activePid })
+    save(st)
+    this.panelShow = false
+    sys.toast('已设置 ' + btn.name)
+    sys.vibrateShort()
+    this.refresh()
+  },
+
+  onInputChange(e) {
+    this.inputVal = e && e.value !== undefined ? e.value : ''
+  },
+
+  onCustomAdd() {
+    const name = String(this.inputVal || '').trim()
+    if (!name) { sys.toast('请先输入课程名'); return }
+    const st = getData()
+    if (!st) return
+    // 同名复用，不重复建
+    let subj = null
+    for (let i = 0; i < st.subjects.length; i++) {
+      if (st.subjects[i].name === name) { subj = st.subjects[i]; break }
+    }
+    if (!subj) {
+      const used = st.subjects.length
+      subj = {
+        id: 'c_' + genId(),
+        name: name,
+        color: CUSTOM_COLORS[used % CUSTOM_COLORS.length],
+        custom: true
+      }
+      st.subjects.push(subj)
+    }
+    // 直接填入当前节
+    const dayNo = String(this.selDay + 1)
+    const slot = st.courses[dayNo] || (st.courses[dayNo] = [])
+    for (let i = slot.length - 1; i >= 0; i--) {
+      if (slot[i].periodId === this.activePid) slot.splice(i, 1)
+    }
+    slot.push({ subjectId: subj.id, periodId: this.activePid })
+    save(st)
+    this.panelShow = false
+    sys.toast('已添加 ' + name)
+    sys.vibrateShort()
+    this.refresh()
+  },
+
+  onClearSlot() {
+    const st = getData()
+    if (!st || !this.activePid) return
+    const dayNo = String(this.selDay + 1)
+    const slot = st.courses[dayNo] || []
+    for (let i = slot.length - 1; i >= 0; i--) {
+      if (slot[i].periodId === this.activePid) slot.splice(i, 1)
+    }
+    save(st)
+    this.panelShow = false
+    sys.toast('已清空本节')
+    sys.vibrateShort()
+    this.refresh()
+  }
+}
+</script>
+
+<style>
+.page {
+  width: 466px;
+  height: 466px;
+  background-color: #000000;
+  position: relative;
+}
+
+.scroll {
+  width: 466px;
+  height: 466px;
+}
+
+.content {
+  width: 466px;
+  padding-left: 48px;
+  padding-right: 48px;
+  padding-top: 80px;
+  padding-bottom: 100px;
+  flex-direction: column;
+  align-items: center;
+}
+
+.title {
+  font-size: 34px;
+  font-weight: bold;
+  color: #ffffff;
+}
+
+.day-bar {
+  margin-top: 20px;
+  width: 370px;
+  height: 88px;
+  border-radius: 26px;
+  background-color: #1c1c20;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  padding-left: 14px;
+  padding-right: 14px;
+}
+
+.arrow {
+  width: 64px;
+  height: 64px;
+  border-radius: 32px;
+  background-color: #2a2a2f;
+  justify-content: center;
+  align-items: center;
+}
+
+.arrow-txt {
+  font-size: 40px;
+  font-weight: bold;
+  color: #ffffff;
+}
+
+.day-name {
+  font-size: 34px;
+  font-weight: bold;
+  color: #ffffff;
+}
+
+.list {
+  margin-top: 18px;
+  width: 370px;
+  flex-direction: column;
+}
+
+/* 三段等宽让科目视觉居中：period 96 + 科目自适应 + 占位 96 */
+.crow {
+  width: 370px;
+  height: 92px;
+  border-radius: 20px;
+  background-color: #232327;
+  margin-bottom: 12px;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  padding-left: 22px;
+  padding-right: 22px;
+}
+
+.crow-period {
+  font-size: 24px;
+  color: rgba(235, 235, 245, 0.45);
+  width: 96px;
+  lines: 1;
+}
+
+.crow-subj {
+  font-size: 30px;
+  font-weight: bold;
+  color: #ffffff;
+  lines: 1;
+  text-overflow: ellipsis;
+}
+
+.crow-subj-none {
+  color: rgba(235, 235, 245, 0.28);
+  font-weight: normal;
+}
+
+.crow-pad {
+  width: 96px;
+  height: 2px;
+}
+
+.empty {
+  width: 370px;
+  height: 90px;
+  justify-content: center;
+  align-items: center;
+}
+
+.empty-txt {
+  font-size: 19px;
+  color: rgba(235, 235, 245, 0.35);
+  text-align: center;
+}
+
+.gap {
+  height: 10px;
+}
+
+/* ===== 选择课程面板 ===== */
+.mask {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 466px;
+  height: 466px;
+  background-color: rgba(0, 0, 0, 0.78);
+}
+
+.panel {
+  position: absolute;
+  left: 0;
+  top: 86px;
+  width: 466px;
+  height: 380px;
+  background-color: #0c0c0e;
+  border-top-width: 1px;
+  border-top-color: rgba(255, 255, 255, 0.12);
+  border-top-style: solid;
+  border-top-left-radius: 30px;
+  border-top-right-radius: 30px;
+  flex-direction: column;
+  align-items: center;
+  padding-top: 20px;
+}
+
+.panel-head {
+  width: 382px;
+  height: 56px;
+  flex-direction: row;
+  align-items: center;
+}
+
+.back {
+  width: 52px;
+  height: 52px;
+  border-radius: 26px;
+  background-color: #232327;
+  justify-content: center;
+  align-items: center;
+}
+
+.back-txt {
+  font-size: 34px;
+  font-weight: bold;
+  color: #ffffff;
+}
+
+.panel-title {
+  margin-left: 16px;
+  font-size: 30px;
+  font-weight: bold;
+  color: #ffffff;
+}
+
+.panel-cur {
+  margin-left: 14px;
+  width: 180px;
+  font-size: 24px;
+  color: rgba(235, 235, 245, 0.45);
+  lines: 1;
+  text-overflow: ellipsis;
+}
+
+.subj-scroll {
+  margin-top: 8px;
+  width: 382px;
+  height: 168px;
+}
+
+.sec-label {
+  margin-top: 10px;
+  font-size: 21px;
+  font-weight: bold;
+  color: #ffffff;
+}
+
+.subj-grid {
+  margin-top: 8px;
+  width: 382px;
+  flex-direction: row;
+  flex-wrap: wrap;
+}
+
+.subj-btn {
+  height: 60px;
+  border-radius: 16px;
+  background-color: #232327;
+  justify-content: center;
+  align-items: center;
+  padding-left: 20px;
+  padding-right: 20px;
+  margin-right: 10px;
+  margin-bottom: 10px;
+}
+
+.subj-btn-on {
+  background-color: #3425ff;
+}
+
+.subj-txt {
+  font-size: 22px;
+  color: #ffffff;
+}
+
+.add-box {
+  margin-top: 4px;
+  width: 382px;
+  height: 72px;
+  border-radius: 18px;
+  background-color: #1a1a1e;
+  flex-direction: row;
+  align-items: center;
+  padding-left: 10px;
+  padding-right: 10px;
+}
+
+.add-input {
+  width: 240px;
+  height: 54px;
+  border-radius: 12px;
+  background-color: #232327;
+  padding-left: 16px;
+  color: #ffffff;
+  font-size: 22px;
+  placeholder-color: rgba(235, 235, 245, 0.3);
+}
+
+.add-ok {
+  margin-left: 10px;
+  width: 96px;
+  height: 54px;
+  border-radius: 12px;
+  background-color: #3425ff;
+  justify-content: center;
+  align-items: center;
+}
+
+.add-ok-txt {
+  font-size: 22px;
+  font-weight: bold;
+  color: #ffffff;
+}
+
+.clear-btn {
+  margin-top: 12px;
+  width: 382px;
+  height: 64px;
+  border-radius: 18px;
+  border-width: 1px;
+  border-color: rgba(255, 69, 58, 0.65);
+  border-style: solid;
+  background-color: rgba(255, 69, 58, 0.06);
+  justify-content: center;
+  align-items: center;
+}
+
+.clear-txt {
+  font-size: 24px;
+  font-weight: bold;
+  color: #FF453A;
+}
+
+.press:active {
+  opacity: 0.72;
+}
+
+/* 方屏适配：无弧形裁边，恢复常规边距 */
+@media screen and (device: watch-square) {
+  .content {
+    padding-left: 40px;
+    padding-right: 40px;
+    padding-top: 40px;
+    padding-bottom: 60px;
+  }
+  .day-bar,
+  .list,
+  .crow {
+    width: 386px;
+  }
+  .panel-head,
+  .subj-scroll,
+  .subj-grid,
+  .add-box,
+  .clear-btn {
+    width: 370px;
+  }
+}
+
+</style>

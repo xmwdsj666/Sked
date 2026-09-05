@@ -1,0 +1,463 @@
+<template>
+  <div class="page">
+    <scroll class="scroll" scroll-y="true">
+      <div class="content">
+        <text class="title">作息时间</text>
+        <text class="subtitle">点击条目编辑，长按删除</text>
+
+        <div for="{{row in rows}}" tid="{{row.key}}">
+          <div class="row press {{row.open ? 'row-open' : ''}}" onclick="onRowTap($idx)" onlongpress="onRowDelete($idx)">
+            <div class="row-left">
+              <text class="row-name">{{row.name}}</text>
+              <text class="row-time">{{row.start}} - {{row.end}}</text>
+            </div>
+            <div class="kind-dot" style="background-color: {{row.kindColor}};"></div>
+          </div>
+
+          <div if="{{row.open}}" class="editor">
+            <div class="f-row press" onclick="onFieldTap('name')">
+              <text class="f-label">名称</text>
+              <text class="f-value">{{row.name}}</text>
+            </div>
+            <picker if="{{subMode === 'name'}}" class="ed-picker-s" type="text" range="{{nameRange}}" selected="{{nameSel}}" onchange="onNamePick"></picker>
+            <div class="f-row press" onclick="onFieldTap('start')">
+              <text class="f-label">开始时间</text>
+              <text class="f-value">{{row.start}}</text>
+            </div>
+            <picker if="{{subMode === 'start'}}" class="ed-picker-s" type="time" format="HH:mm" selected="{{row.start}}" onchange="onStartPick"></picker>
+            <div class="f-row press" onclick="onFieldTap('end')">
+              <text class="f-label">结束时间</text>
+              <text class="f-value">{{row.end}}</text>
+            </div>
+            <picker if="{{subMode === 'end'}}" class="ed-picker-s" type="time" format="HH:mm" selected="{{row.end}}" onchange="onEndPick"></picker>
+            <text class="ed-label">类型</text>
+            <div class="pills">
+              <div class="pill {{kindSel === 0 ? 'pill-on' : ''}}" onclick="onKind(0)">
+                <text class="pill-txt {{kindSel === 0 ? 'pill-txt-on' : ''}}">课程</text>
+              </div>
+              <div class="pill {{kindSel === 1 ? 'pill-on' : ''}}" onclick="onKind(1)">
+                <text class="pill-txt {{kindSel === 1 ? 'pill-txt-on' : ''}}">休息</text>
+              </div>
+            </div>
+            <div class="del-btn press" onclick="onDelTap">
+              <text class="del-txt">删除本时段</text>
+            </div>
+          </div>
+        </div>
+
+        <div class="add-btn press" onclick="onAdd">
+          <text class="add-txt">＋ 添加时段</text>
+        </div>
+        <div class="gap"></div>
+      </div>
+    </scroll>
+  </div>
+</template>
+
+<script>
+import sys from '../../helper/sys.js'
+import { load, getData, save } from '../../store/index.js'
+import { genId, PERIOD_NAME_PRESETS } from '../../core/defaults.js'
+
+export default {
+  data: {
+    rows: [],
+    nameRange: PERIOD_NAME_PRESETS,
+    nameSel: 0,
+    kindSel: 0,
+    openId: '',
+    subMode: ''
+  },
+
+  onInit() {
+    this._loaded = false
+  },
+
+  onReady() {
+    this._loaded = true
+    load()
+    this.refresh()
+  },
+
+  onShow() {
+    if (this._loaded) this.refresh()
+  },
+
+  refresh() {
+    if (!this._loaded) return
+    const st = getData()
+    if (!st) return
+    const periods = (st.periods || []).slice().sort(function (a, b) { return a.start < b.start ? -1 : 1 })
+    const rows = []
+    for (let i = 0; i < periods.length; i++) {
+      const p = periods[i]
+      rows.push({
+        key: p.id,
+        id: p.id,
+        name: p.name,
+        start: p.start,
+        end: p.end,
+        kindColor: p.type === 'class' ? '#0A84FF' : '#48484A',
+        open: this.openId === p.id
+      })
+    }
+    this.rows = rows
+  },
+
+  onFieldTap(mode) {
+    this.subMode = this.subMode === mode ? '' : mode
+    sys.vibrateShort()
+  },
+
+  onRowTap(idx) {
+    if (idx === undefined || !this.rows[idx]) return
+    const item = this.rows[idx]
+    this.subMode = ''
+    if (this.openId === item.id) {
+      this.openId = ''
+    } else {
+      this.openId = item.id
+      const st = getData()
+      for (let i = 0; i < st.periods.length; i++) {
+        if (st.periods[i].id === item.id) {
+          const p = st.periods[i]
+          for (let j = 0; j < this.nameRange.length; j++) {
+            if (this.nameRange[j] === p.name) { this.nameSel = j; break }
+          }
+          this.kindSel = p.type === 'class' ? 0 : 1
+          break
+        }
+      }
+    }
+    sys.vibrateShort()
+    this.refresh()
+  },
+
+  onRowDelete(idx) {
+    if (idx === undefined || !this.rows[idx]) return
+    const item = this.rows[idx]
+    const st = getData()
+    for (let i = st.periods.length - 1; i >= 0; i--) {
+      if (st.periods[i].id === item.id) st.periods.splice(i, 1)
+    }
+    // 同步删除引用该时段的课程
+    for (const d in st.courses) {
+      const arr = st.courses[d]
+      for (let i = arr.length - 1; i >= 0; i--) {
+        if (arr[i].periodId === item.id) arr.splice(i, 1)
+      }
+    }
+    if (this.openId === item.id) this.openId = ''
+    save(st)
+    sys.toast('已删除 ' + item.name)
+    this.refresh()
+  },
+
+  onNamePick(e) {
+    const st = getData()
+    const p = this.findPeriod(st, this.openId)
+    if (!p || !e) return
+    p.name = e.newValue
+    for (let i = 0; i < this.nameRange.length; i++) {
+      if (this.nameRange[i] === e.newValue) { this.nameSel = i; break }
+    }
+    this.subMode = ''
+    save(st)
+    this.refresh()
+  },
+
+  onStartPick(e) {
+    const st = getData()
+    const p = this.findPeriod(st, this.openId)
+    if (!p || !e) return
+    p.start = (e.hour < 10 ? '0' : '') + e.hour + ':' + (e.minute < 10 ? '0' : '') + e.minute
+    save(st)
+    this.refresh()
+  },
+
+  onEndPick(e) {
+    const st = getData()
+    const p = this.findPeriod(st, this.openId)
+    if (!p || !e) return
+    p.end = (e.hour < 10 ? '0' : '') + e.hour + ':' + (e.minute < 10 ? '0' : '') + e.minute
+    save(st)
+    this.refresh()
+  },
+
+  onKind(idx) {
+    this.kindSel = idx
+    const st = getData()
+    const p = this.findPeriod(st, this.openId)
+    if (!p) return
+    p.type = idx === 0 ? 'class' : 'break'
+    save(st)
+    this.refresh()
+  },
+
+  onDelTap() {
+    const st = getData()
+    for (let i = st.periods.length - 1; i >= 0; i--) {
+      if (st.periods[i].id === this.openId) {
+        sys.toast('已删除 ' + st.periods[i].name)
+        st.periods.splice(i, 1)
+        break
+      }
+    }
+    for (const d in st.courses) {
+      const arr = st.courses[d]
+      for (let i = arr.length - 1; i >= 0; i--) {
+        if (arr[i].periodId === this.openId) arr.splice(i, 1)
+      }
+    }
+    this.openId = ''
+    save(st)
+    this.refresh()
+  },
+
+  onAdd() {
+    const st = getData()
+    st.periods.push({ id: genId(), name: '自习', start: '21:00', end: '21:45', type: 'class' })
+    save(st)
+    sys.vibrateShort()
+    this.refresh()
+  },
+
+  findPeriod(st, id) {
+    if (!st || !id) return null
+    for (let i = 0; i < st.periods.length; i++) {
+      if (st.periods[i].id === id) return st.periods[i]
+    }
+    return null
+  }
+}
+</script>
+
+<style>
+.page {
+  width: 466px;
+  height: 466px;
+  background-color: #000000;
+}
+
+.scroll {
+  width: 466px;
+  height: 466px;
+}
+
+.content {
+  width: 466px;
+  padding-left: 48px;
+  padding-right: 48px;
+  padding-top: 80px;
+  padding-bottom: 100px;
+  flex-direction: column;
+  align-items: center;
+}
+
+.title {
+  font-size: 34px;
+  font-weight: bold;
+  color: #ffffff;
+}
+
+.subtitle {
+  margin-top: 6px;
+  font-size: 18px;
+  color: rgba(235, 235, 245, 0.4);
+}
+
+.row {
+  margin-top: 12px;
+  width: 370px;
+  height: 68px;
+  justify-content: space-between;
+  border-radius: 20px;
+  border-width: 1px;
+  border-color: rgba(255, 255, 255, 0.07);
+  border-style: solid;
+  background: linear-gradient(to bottom right, #1d1d22, #141418);
+  flex-direction: row;
+  align-items: center;
+  padding-left: 22px;
+  padding-right: 22px;
+}
+
+.row-open {
+  border-color: rgba(10, 132, 255, 0.7);
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+  margin-bottom: 0;
+}
+
+.row-name {
+  font-size: 24px;
+  font-weight: bold;
+  color: #ffffff;
+}
+
+.row-time {
+  margin-left: 16px;
+  font-size: 19px;
+  color: rgba(235, 235, 245, 0.55);
+}
+
+.kind-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 6px;
+}
+
+.row-left {
+  flex-direction: row;
+  align-items: center;
+}
+
+.editor {
+  width: 370px;
+  border-width: 1px;
+  border-color: rgba(10, 132, 255, 0.4);
+  border-style: solid;
+  border-top-width: 0;
+  background-color: #101014;
+  border-bottom-left-radius: 20px;
+  border-bottom-right-radius: 20px;
+  margin-bottom: 12px;
+  flex-direction: column;
+  align-items: center;
+  padding-top: 14px;
+  padding-bottom: 18px;
+}
+
+.f-row {
+  width: 300px;
+  height: 54px;
+  border-bottom-width: 1px;
+  border-bottom-color: rgba(255, 255, 255, 0.08);
+  border-bottom-style: solid;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 4px;
+}
+
+.f-label {
+  font-size: 19px;
+  color: rgba(235, 235, 245, 0.5);
+}
+
+.f-value {
+  font-size: 22px;
+  font-weight: bold;
+  color: #ffffff;
+}
+
+.ed-label {
+  margin-top: 8px;
+  font-size: 18px;
+  color: rgba(235, 235, 245, 0.5);
+}
+
+.ed-picker-s {
+  width: 300px;
+  height: 110px;
+  margin-top: 4px;
+  font-size: 20px;
+  color: rgba(235, 235, 245, 0.4);
+  selected-font-size: 28px;
+  selected-color: #ffffff;
+  selected-background-color: rgba(10, 132, 255, 0.15);
+  linecolor: #26262c;
+}
+
+.pills {
+  margin-top: 10px;
+  flex-direction: row;
+}
+
+.pill {
+  height: 42px;
+  border-radius: 21px;
+  background-color: #1c1c1e;
+  border-width: 1px;
+  border-color: rgba(255, 255, 255, 0.08);
+  border-style: solid;
+  justify-content: center;
+  align-items: center;
+  padding-left: 18px;
+  padding-right: 18px;
+  margin-left: 7px;
+  margin-right: 7px;
+}
+
+.pill-on {
+  background-color: #ffffff;
+  border-color: #ffffff;
+}
+
+.pill-txt {
+  font-size: 19px;
+  color: rgba(235, 235, 245, 0.75);
+}
+
+.pill-txt-on {
+  color: #000000;
+  font-weight: bold;
+}
+
+.del-btn {
+  margin-top: 14px;
+  height: 44px;
+  border-radius: 22px;
+  border-width: 1px;
+  border-color: rgba(255, 69, 58, 0.5);
+  border-style: solid;
+  justify-content: center;
+  align-items: center;
+  padding-left: 24px;
+  padding-right: 24px;
+}
+
+.del-txt {
+  font-size: 19px;
+  color: #FF453A;
+}
+
+.add-btn {
+  margin-top: 18px;
+  height: 56px;
+  border-radius: 28px;
+  border-width: 1px;
+  border-color: rgba(10, 132, 255, 0.55);
+  border-style: solid;
+  background-color: rgba(10, 132, 255, 0.12);
+  justify-content: center;
+  align-items: center;
+  padding-left: 30px;
+  padding-right: 30px;
+}
+
+.add-txt {
+  font-size: 21px;
+  font-weight: bold;
+  color: #0A84FF;
+}
+
+.gap {
+  height: 10px;
+}
+
+.press:active {
+  opacity: 0.72;
+}
+
+/* 方屏适配：无弧形裁边，恢复常规边距 */
+@media screen and (device: watch-square) {
+  .content {
+    padding-left: 40px;
+    padding-right: 40px;
+    padding-top: 40px;
+    padding-bottom: 60px;
+  }
+}
+
+</style>

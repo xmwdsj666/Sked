@@ -1,0 +1,13 @@
+{
+    "blue-os-previewer.device": "watch-square",
+    "blue-os-previewer.appMode": "app",
+    "blue-os-previewer.appUpdateMethod": 0,
+    "blue-os-previewer.resolution": {
+        "watch-square": {
+            "width": 390,
+            "height": 450,
+            "label": "390*450"
+        }
+    },
+    "blue-os-previewer.otherSetting": ""
+}

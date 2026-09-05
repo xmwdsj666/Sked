@@ -1,0 +1,40 @@
+{
+  "package": "com.qwq.timetable",
+  "name": "高中课表",
+  "versionName": "1.0.0",
+  "versionCode": 1,
+  "minPlatformVersion": 1070,
+  "icon": "/assets/images/icon.png",
+  "appCategory": ["education"],
+  "deviceTypeList": ["watch-round", "watch-square"],
+  "config": {
+    "logLevel": "debug",
+    "designWidth": 466
+  },
+  "features": [
+    { "name": "blueos.storage.storage" },
+    { "name": "system.storage" },
+    { "name": "blueos.storage.file" },
+    { "name": "system.file" },
+    { "name": "blueos.window.prompt" },
+    { "name": "system.prompt" },
+    { "name": "blueos.hardware.vibrator.vibrator" },
+    { "name": "system.vibrator" },
+    { "name": "blueos.app.appmanager.router" },
+    { "name": "system.router" }
+  ],
+  "router": {
+    "entry": "pages/Home",
+    "pages": {
+      "pages/Home": { "component": "index", "launchMode": "singleTask" },
+      "pages/Week": { "component": "index" },
+      "pages/Edit": { "component": "index" },
+      "pages/Settings": { "component": "index" },
+      "pages/Periods": { "component": "index" },
+      "pages/Countdowns": { "component": "index" }
+    }
+  },
+  "display": {
+    "backgroundColor": "#000000"
+  }
+}
