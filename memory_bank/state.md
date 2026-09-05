@@ -26,7 +26,7 @@
 
 ## 错误模式清单（维护时规避）
 - 禁 flex:1 / box-shadow / backdrop-filter / CSS transition / flex-grow / text-align 依赖 / position:fixed；覆盖层用 absolute + .page position:relative
-- for 循环内事件传参必须 ；handler 按 this.rows[idx] 取条目
+- $idx/$item 仅 for 循环内有效：静态元素 onclick 传 $idx 得 undefined（用独立无参 handler）；for 内传参必须 $idx，handler 按 this.rows[idx] 取条目
 - Feature API 禁止模块加载期调用；setInterval/onDestroy 配对；picker type 不可动态改；require 必须字面量（不许抽函数传变量）
 - file.readText 仅异步——同步流程等回调=必失效；storage.set 仅异步+字符串化+fail 上报
 - getSync 异常≠数据损坏，禁止在 repaired 分支无条件重置主存
