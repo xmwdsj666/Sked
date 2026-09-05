@@ -4,7 +4,7 @@
   "private": true,
   "description": "Sked — BlueOS 手表课表应用",
   "scripts": {
-    "test": "node --test tests/timetable.test.mjs"
+    "test": "node --test tests/timetable.test.mjs tests/store.test.mjs"
   },
   "devDependencies": {},
   "browserslist": [

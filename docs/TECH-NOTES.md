@@ -99,3 +99,13 @@
 - 内置工具链 hap-toolkit 1.9.14；模板 scripts：`hap server --watch` / `hap build` / `hap release` / `hap debug`。
 - 模板 package.json 含 `"gen": "node ./scripts/gen/index.js"`（页面生成器，本工程未用——手工管理页面注册）。
 - 模拟器支持 watch-round；宿主工程 designWidth 466。
+## 6h. file.readText 只有异步形态：严禁在同步流程里等回调（实测踩坑）
+
+- 现象：快照恢复在 load() 里同步调用 readText({uri, success})，随后立即读结果变量——回调尚未执行，恢复恒不生效；主存损坏时直接重置用户数据。
+- 规则：涉及恢复/补偿的异步读取，在 app.ux onCreate 预热发起、回调落缓存，后续同步流程只读缓存（本工程 store.primeSnapshot）。
+
+## 6i. storage 写入只有异步 set（无 setSync）：value 一律 JSON 字符串化 + 失败必须可见（实测决策）
+
+- 官方 set/getSync 的 value 名义支持 Object/Array，但真机固件序列化行为不一；本工程统一 JSON.stringify 写入、读出后 parse（兼容旧对象形态）。
+- set 需带 fail 回调；persist 返回成败，失败 toast『保存失败，请重试』，禁止静默吞错。
+- getSync 抛异常≠数据损坏：瞬态故障时只用内存数据、不重置主存（防误清空放大）。

@@ -32,7 +32,7 @@
       </div>
     </scroll>
 
-    <!-- 选择课程面板（底部覆盖层，图二样式） -->
+    <!-- 选择课程面板（底部覆盖层）：先选科目为草稿，点「保存」才写入 -->
     <div if="{{panelShow}}" class="mask">
       <div class="panel">
         <div class="panel-head">
@@ -40,25 +40,25 @@
             <text class="back-txt">‹</text>
           </div>
           <text class="panel-title">选择课程</text>
-          <text class="panel-cur">{{curName}}</text>
+          <text class="panel-cur">{{pendingLabel}}</text>
         </div>
 
         <scroll class="subj-scroll" scroll-y="true">
           <text class="sec-label">预设科目</text>
           <div class="subj-grid">
-            <div for="{{s in presetBtns}}" tid="{{s.key}}" class="subj-btn press {{s.name === curName ? 'subj-btn-on' : ''}}" onclick="onPickSubject($idx)">
+            <div for="{{s in presetBtns}}" tid="{{s.key}}" class="subj-btn press {{s.key === pendingId ? 'subj-btn-on' : ''}}" onclick="onPickSubject($idx)">
               <text class="subj-txt">{{s.name}}</text>
             </div>
           </div>
 
           <text class="sec-label">自定义课程</text>
           <div class="subj-grid">
-            <div for="{{s in customBtns}}" tid="{{s.key}}" class="subj-btn press {{s.name === curName ? 'subj-btn-on' : ''}}" onclick="onPickSubject($idx)">
+            <div for="{{s in customBtns}}" tid="{{s.key}}" class="subj-btn press {{s.key === pendingId ? 'subj-btn-on' : ''}}" onclick="onPickSubject($idx)">
               <text class="subj-txt">{{s.name}}</text>
             </div>
           </div>
 
-          <!-- 新增自定义：输入框 + 确定 -->
+          <!-- 新增自定义：输入框 + 确定（仅建档选中，仍需点「保存」） -->
           <div class="add-box">
             <input class="add-input" type="text" placeholder="输入课程名" value="{{inputVal}}" onchange="onInputChange"></input>
             <div class="add-ok press" onclick="onCustomAdd">
@@ -67,6 +67,9 @@
           </div>
         </scroll>
 
+        <div class="save-btn press" onclick="onSaveCourse">
+          <text class="save-txt">保存</text>
+        </div>
         <div class="clear-btn press" onclick="onClearSlot">
           <text class="clear-txt">清空当前</text>
         </div>
@@ -88,7 +91,8 @@ export default {
     panelShow: false,
     presetBtns: [],
     customBtns: [],
-    curName: '',
+    pendingId: '',
+    pendingLabel: '',
     inputVal: '',
     activePid: '',
     day: ''
@@ -163,7 +167,10 @@ export default {
     this.rows = rows
   },
 
-  syncCurName() {
+  /** 打开面板时同步当前节已保存的科目为草稿 */
+  syncDraft() {
+    this.pendingId = ''
+    this.pendingLabel = ''
     const st = getData()
     if (!st) return
     let course = null
@@ -172,11 +179,14 @@ export default {
     for (let j = 0; j < dayList.length; j++) {
       if (dayList[j] && dayList[j].periodId === this.activePid) { course = dayList[j]; break }
     }
-    if (!course) { this.curName = ''; return }
+    if (!course) return
     for (let i = 0; i < st.subjects.length; i++) {
-      if (st.subjects[i].id === course.subjectId) { this.curName = st.subjects[i].name; return }
+      if (st.subjects[i].id === course.subjectId) {
+        this.pendingId = st.subjects[i].id
+        this.pendingLabel = st.subjects[i].name
+        return
+      }
     }
-    this.curName = ''
   },
 
   onPrevDay() {
@@ -195,7 +205,7 @@ export default {
     if (idx === undefined || !this.rows[idx]) return
     this.activePid = this.rows[idx].pid
     this.inputVal = ''
-    this.syncCurName()
+    this.syncDraft()
     this.panelShow = true
     sys.vibrateShort()
   },
@@ -204,29 +214,21 @@ export default {
     this.panelShow = false
   },
 
+  /** 点科目 = 选中草稿（高亮），点「保存」才写入 */
   onPickSubject(idx) {
     const all = this.presetBtns.concat(this.customBtns)
     const btn = all[idx]
     if (!btn) return
-    const st = getData()
-    if (!st) return
-    const dayNo = String(this.selDay + 1)
-    const slot = st.courses[dayNo] || (st.courses[dayNo] = [])
-    for (let i = slot.length - 1; i >= 0; i--) {
-      if (slot[i].periodId === this.activePid) slot.splice(i, 1)
-    }
-    slot.push({ subjectId: btn.key, periodId: this.activePid })
-    save(st)
-    this.panelShow = false
-    sys.toast('已设置 ' + btn.name)
+    this.pendingId = btn.key
+    this.pendingLabel = btn.name
     sys.vibrateShort()
-    this.refresh()
   },
 
   onInputChange(e) {
     this.inputVal = e && e.value !== undefined ? e.value : ''
   },
 
+  /** 自定义科目：立即建档（科目是独立数据），课程指派仍为草稿 */
   onCustomAdd() {
     const name = String(this.inputVal || '').trim()
     if (!name) { sys.toast('请先输入课程名'); return }
@@ -246,17 +248,34 @@ export default {
         custom: true
       }
       st.subjects.push(subj)
+      save(st)
     }
-    // 直接填入当前节
+    this.pendingId = subj.id
+    this.pendingLabel = subj.name
+    this.inputVal = ''
+    sys.toast('已添加 ' + name + '，点保存生效')
+    sys.vibrateShort()
+    this.refresh()
+  },
+
+  /** 「保存」：把草稿科目写入当前节 */
+  onSaveCourse() {
+    if (!this.pendingId) {
+      // 未做任何选择，仅收起面板
+      this.panelShow = false
+      return
+    }
+    const st = getData()
+    if (!st || !this.activePid) return
     const dayNo = String(this.selDay + 1)
     const slot = st.courses[dayNo] || (st.courses[dayNo] = [])
     for (let i = slot.length - 1; i >= 0; i--) {
       if (slot[i].periodId === this.activePid) slot.splice(i, 1)
     }
-    slot.push({ subjectId: subj.id, periodId: this.activePid })
-    save(st)
+    slot.push({ subjectId: this.pendingId, periodId: this.activePid })
+    const ok = save(st)
     this.panelShow = false
-    sys.toast('已添加 ' + name)
+    sys.toast(ok ? ('已保存 ' + this.pendingLabel) : '保存失败，请重试')
     sys.vibrateShort()
     this.refresh()
   },
@@ -269,9 +288,11 @@ export default {
     for (let i = slot.length - 1; i >= 0; i--) {
       if (slot[i].periodId === this.activePid) slot.splice(i, 1)
     }
-    save(st)
+    const ok = save(st)
+    this.pendingId = ''
+    this.pendingLabel = ''
     this.panelShow = false
-    sys.toast('已清空本节')
+    sys.toast(ok ? '已清空本节' : '保存失败，请重试')
     sys.vibrateShort()
     this.refresh()
   }
@@ -471,7 +492,7 @@ export default {
 .subj-scroll {
   margin-top: 8px;
   width: 382px;
-  height: 168px;
+  height: 132px;
 }
 
 .sec-label {
@@ -548,11 +569,27 @@ export default {
   color: #ffffff;
 }
 
-.clear-btn {
-  margin-top: 12px;
+.save-btn {
+  margin-top: 10px;
   width: 382px;
-  height: 64px;
-  border-radius: 18px;
+  height: 60px;
+  border-radius: 16px;
+  background-color: #0A84FF;
+  justify-content: center;
+  align-items: center;
+}
+
+.save-txt {
+  font-size: 25px;
+  font-weight: bold;
+  color: #ffffff;
+}
+
+.clear-btn {
+  margin-top: 8px;
+  width: 382px;
+  height: 54px;
+  border-radius: 16px;
   border-width: 1px;
   border-color: rgba(255, 69, 58, 0.65);
   border-style: solid;
@@ -562,7 +599,7 @@ export default {
 }
 
 .clear-txt {
-  font-size: 24px;
+  font-size: 22px;
   font-weight: bold;
   color: #FF453A;
 }
@@ -588,6 +625,7 @@ export default {
   .subj-scroll,
   .subj-grid,
   .add-box,
+  .save-btn,
   .clear-btn {
     width: 370px;
   }

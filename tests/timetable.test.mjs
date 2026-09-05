@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
-  normalizeToMonday, weekNumberOf, currentPeriod,
+  normalizeToMonday, weekNumberOf, currentPeriod, isValidPeriodRange,
   coursesForDay, daysUntil, formatRemain, holidayAt, sanitize
 } from '../src/core/timetable.js'
 import { makeDefaultData, DATA_VERSION } from '../src/core/defaults.js'
@@ -169,4 +169,28 @@ test('sanitize: 非法课程条目过滤；旧 weekType 字段不致失败', () 
   assert.equal(r.data.courses['1'].length, 1) // weekType 已无意义但条目合法，保留
   assert.equal(r.data.countdowns.length, 0)
   assert.equal(r.repaired, false) // 这些属于过滤而非结构修复（courses 数组本身合法）
+})
+
+test('isValidPeriodRange: 开始需早于结束', () => {
+  assert.equal(isValidPeriodRange('07:20', '07:50'), true)
+  assert.equal(isValidPeriodRange('08:00', '08:00'), false)
+  assert.equal(isValidPeriodRange('22:00', '06:00'), false) // 跨零不合法
+  assert.equal(isValidPeriodRange('bad', '08:00'), false)
+})
+
+test('sanitize: 丢弃 start>=end 的坏时段（防止弄坏首页倒计时）', () => {
+  const raw = {
+    semesterStart: '2026-09-01',
+    subjects: [{ id: 'math', name: '数学', color: '#fff' }],
+    periods: [
+      { id: 'a', name: '一', start: '08:00', end: '08:45', type: 'class' },
+      { id: 'b', name: '坏', start: '22:00', end: '06:00', type: 'class' },
+      { id: 'c', name: '坏2', start: '09:00', end: '09:00', type: 'class' }
+    ],
+    courses: {},
+    countdowns: []
+  }
+  const r = sanitize(raw, () => makeDefaultData(new Date(2026, 8, 5)))
+  assert.equal(r.data.periods.length, 1)
+  assert.equal(r.data.periods[0].id, 'a')
 })

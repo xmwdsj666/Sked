@@ -2,11 +2,19 @@
 /**
  * 应用入口：全局生命周期。
  * 注意：不要在模块加载或 onInit 之前调用 Feature API（编译期静态预渲染限制）。
- * BLE 课表导入通道已于 2026-09-05 撤销（编辑全部在手表端完成），
- * 原实现归档于 attic/ble-import/，如需恢复见该目录 README。
+ * onCreate 预热快照读取：file.readText 只有异步形态，启动期发起、
+ * 回调完成后缓存到 store，供主存损坏时 load() 同步取用。
  */
+import { primeSnapshot } from './store/index.js'
+
 export default {
-  onCreate() {},
+  onCreate() {
+    try {
+      primeSnapshot()
+    } catch (e) {
+      // 快照预热失败不影响主流程
+    }
+  },
   onDestroy() {}
 }
 </script>

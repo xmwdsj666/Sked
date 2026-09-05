@@ -47,6 +47,22 @@ export function coursesForDay(courses, day) {
   })
 }
 
+/** 'HH:mm' → 当日分钟数（格式非法返回 NaN） */
+export function timeToMin(hm) {
+  const p = String(hm || '').split(':')
+  const h = parseInt(p[0], 10)
+  const m = parseInt(p[1], 10)
+  if (isNaN(h) || isNaN(m)) return NaN
+  return h * 60 + m
+}
+
+/** 时段有效性：开始必须早于结束（不支持跨零点，高中场景无此需求） */
+export function isValidPeriodRange(start, end) {
+  const s = timeToMin(start)
+  const e = timeToMin(end)
+  return !isNaN(s) && !isNaN(e) && s < e
+}
+
 /**
  * 当前处于哪个时段
  * @param {Array<{id,name,start,end,type}>} periods
@@ -59,17 +75,13 @@ export function coursesForDay(courses, day) {
 export function currentPeriod(periods, now) {
   const sorted = (periods || []).slice().sort((a, b) => (a.start < b.start ? -1 : 1))
   const nowMin = now.getHours() * 60 + now.getMinutes()
-  const toMin = function (hm) {
-    const p = String(hm || '00:00').split(':')
-    return parseInt(p[0], 10) * 60 + parseInt(p[1], 10)
-  }
   if (!sorted.length) {
     return { state: 'after', period: null, nextPeriod: null, remainSec: 0, totalSec: 0 }
   }
   for (let i = 0; i < sorted.length; i++) {
     const p = sorted[i]
-    const s = toMin(p.start)
-    const e = toMin(p.end)
+    const s = timeToMin(p.start)
+    const e = timeToMin(p.end)
     if (nowMin >= s && nowMin < e) {
       return {
         state: 'in',
@@ -161,7 +173,8 @@ export function sanitize(raw, makeDefault) {
   if (Array.isArray(raw.periods)) {
     out.periods = raw.periods.filter(function (p) {
       return p && typeof p.id === 'string' && typeof p.name === 'string' &&
-        /^\d{2}:\d{2}$/.test(p.start) && /^\d{2}:\d{2}$/.test(p.end)
+        /^\d{2}:\d{2}$/.test(p.start) && /^\d{2}:\d{2}$/.test(p.end) &&
+        isValidPeriodRange(p.start, p.end)
     })
     if (!out.periods.length) out.periods = def.periods
   } else {
