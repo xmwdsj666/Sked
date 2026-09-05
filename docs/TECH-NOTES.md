@@ -121,3 +121,8 @@
 
 - 现象：时间滚轮滚动选中后，change 回调把新值写进 data，而该 data 正绑在 picker 的 selected 上——框架随即把值回写给 picker，引擎就地重置滚轴，触发 `adjust_scroller initial:-2147483648` 溢出：刚滚的那一列在选中带渲染成暗块/空块，未动过的列正常。
 - 规则：picker 的 selected 只做初始定位（进页面赋值一次）；change 回调只更新草稿字段（与 selected 绑定字段分离，如 startInit/pStart），滚轮位置由引擎自己维护。
+## 6m. FrameRenderElement deliverPositionEvent 连发 = 交互事件投递失败线索；跨工程模拟器污染（实测观察）
+
+- 现象：picker 引擎错误清零后仍「点了没反应」时，模拟器日志每秒连发 `FrameRenderElement deliverPositionEvent` 错误——交互位置事件未能投递到组件。
+- 关联因素（按嫌疑排序）：picker loop="true"（新引入后出现，已回滚）；高度 260px（已回滚 300px）；**跨工程污染**——模拟器多次读取另一项目 blueos-dict 的 build 文件并崩溃（0xC0000005），Studio 预览可能串项目，验证前先重启 Studio 确认只开一个工程。
+- 若回滚后仍复现：弃用时间 picker，改 ± 步进按钮方案。

@@ -13,13 +13,13 @@
         <picker class="ed-picker" type="text" range="{{typeRange}}" selected="{{typeSel}}" onchange="onTypePick"></picker>
 
         <text class="ed-label">名称</text>
-        <picker class="ed-picker" type="text" range="{{nameRange}}" selected="{{nameSel}}" loop="true" onchange="onNamePick"></picker>
+        <picker class="ed-picker" type="text" range="{{nameRange}}" selected="{{nameSel}}" onchange="onNamePick"></picker>
 
         <text class="ed-label">开始时间</text>
-        <picker class="ed-picker" type="time" format="HH:mm" selected="{{pStart}}" loop="true" onchange="onStartPick"></picker>
+        <picker class="ed-picker" type="time" format="HH:mm" selected="{{pStart}}" onchange="onStartPick"></picker>
 
         <text class="ed-label">结束时间</text>
-        <picker class="ed-picker" type="time" format="HH:mm" selected="{{pEnd}}" loop="true" onchange="onEndPick"></picker>
+        <picker class="ed-picker" type="time" format="HH:mm" selected="{{pEnd}}" onchange="onEndPick"></picker>
 
         <div class="save-btn press" onclick="onSave">
           <text class="save-txt">保存</text>
@@ -247,7 +247,7 @@ export default {
 .ed-picker {
   margin-top: 4px;
   width: 370px;
-  height: 260px;
+  height: 300px;
   font-size: 24px;
   color: rgba(235, 235, 245, 0.55);
   selected-font-size: 36px;
