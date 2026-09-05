@@ -227,7 +227,7 @@ export default {
   width: 330px;
   height: 300px;
   font-size: 22px;
-  color: rgba(235, 235, 245, 0.4);
+  color: rgba(235, 235, 245, 0.55);
   selected-font-size: 32px;
   selected-color: #ffffff;
   selected-background-color: rgba(10, 132, 255, 0.15);
