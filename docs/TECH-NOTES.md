@@ -85,7 +85,7 @@
 - 现象：编辑面板里并排放 2-3 个小高度 picker（110~150px）时，滚轮实际渲染内容超出声明高度，视觉上与上下 label/按钮重叠。
 - 规则：**一个面板同一时刻只显示一个 picker**。表单一律做成「字段行（label + 当前值，点击展开）+ `if` 控制的单个 picker，选完自动收起」模式（本工程 `subMode` 模式，见 Edit/Periods）。
 - 例外：Countdowns 页经用户要求已回退为「label + 双 picker 直显」旧版（2026-09-05，用户偏好直显）——勿再擅自改回 subMode。
-- picker 高度经验值：130~180px；`selected-background-color` 设为半透明色块辅助聚焦。
+- 【2026-09-05 修正】picker 高度必须 ≥300px（官方滚轮默认字号 40px/选中 56px，滚轮盒需要大空间）。实测 130~160px 会触发引擎错误 `PickerBoxRenderElement height is too small`，伴随 `adjust_scroller initial:-2147483648`（初始偏移 int32 溢出）——表现为滚轮错位叠字、选中不生效、整块空白。此前记录的「130~180px 经验值」是错误结论。`selected-background-color` 设为半透明色块辅助聚焦。
 - 防回归：模板中同时可见的 `<picker` 数量（不叠 if 的）每页 ≤ 2。
 
 ## 6g. 定宽文本溢出：大数字自适应字号

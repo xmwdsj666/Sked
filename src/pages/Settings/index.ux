@@ -225,7 +225,7 @@ export default {
 
 .ed-picker {
   width: 330px;
-  height: 160px;
+  height: 300px;
   font-size: 22px;
   color: rgba(235, 235, 245, 0.4);
   selected-font-size: 32px;

@@ -252,7 +252,7 @@ export default {
 .ed-picker {
   margin-top: 6px;
   width: 370px;
-  height: 130px;
+  height: 300px;
   font-size: 22px;
   color: rgba(235, 235, 245, 0.4);
   selected-font-size: 30px;
