@@ -9,16 +9,8 @@
           <text class="head-title">编辑时段</text>
         </div>
 
-        <!-- 类型置顶：始终可见可点 -->
         <text class="ed-label">类型</text>
-        <div class="pills">
-          <div class="pill {{pType === 'class' ? 'pill-on' : ''}}" onclick="onKindClass">
-            <text class="pill-txt {{pType === 'class' ? 'pill-txt-on' : ''}}">课程</text>
-          </div>
-          <div class="pill {{pType === 'break' ? 'pill-on' : ''}}" onclick="onKindBreak">
-            <text class="pill-txt {{pType === 'break' ? 'pill-txt-on' : ''}}">休息</text>
-          </div>
-        </div>
+        <picker class="ed-picker" type="text" range="{{typeRange}}" selected="{{typeSel}}" onchange="onTypePick"></picker>
 
         <text class="ed-label">名称</text>
         <picker class="ed-picker" type="text" range="{{nameRange}}" selected="{{nameSel}}" loop="true" onchange="onNamePick"></picker>
@@ -59,6 +51,8 @@ export default {
     isNew: false,
     nameRange: PERIOD_NAME_PRESETS,
     nameSel: 0,
+    typeRange: ['课程', '休息'],
+    typeSel: 0,
     pName: '',
     pStart: '08:00',
     pEnd: '08:45',
@@ -100,6 +94,7 @@ export default {
     for (let j = 0; j < this.nameRange.length; j++) {
       if (this.nameRange[j] === this.pName) { this.nameSel = j; break }
     }
+    this.typeSel = this.pType === 'break' ? 1 : 0
     this._loaded = true
   },
 
@@ -121,14 +116,10 @@ export default {
     this.pEnd = (e.hour < 10 ? '0' : '') + e.hour + ':' + (e.minute < 10 ? '0' : '') + e.minute
   },
 
-  onKindClass() {
-    this.pType = 'class'
-    sys.vibrateShort()
-  },
-
-  onKindBreak() {
-    this.pType = 'break'
-    sys.vibrateShort()
+  onTypePick(e) {
+    if (!e) return
+    this.pType = e.newValue === '休息' ? 'break' : 'class'
+    this.typeSel = e.newValue === '休息' ? 1 : 0
   },
 
   onSave() {
@@ -244,59 +235,22 @@ export default {
 }
 
 .ed-label {
-  margin-top: 14px;
+  margin-top: 10px;
   width: 370px;
-  font-size: 19px;
+  font-size: 22px;
   color: rgba(235, 235, 245, 0.5);
 }
 
 .ed-picker {
-  margin-top: 6px;
+  margin-top: 4px;
   width: 370px;
-  height: 300px;
-  font-size: 22px;
+  height: 260px;
+  font-size: 24px;
   color: rgba(235, 235, 245, 0.4);
-  selected-font-size: 30px;
+  selected-font-size: 34px;
   selected-color: #ffffff;
   selected-background-color: rgba(255, 255, 255, 0.08);
   linecolor: #26262c;
-}
-
-.pills {
-  margin-top: 10px;
-  width: 370px;
-  flex-direction: row;
-  justify-content: center;
-}
-
-.pill {
-  height: 52px;
-  border-radius: 26px;
-  background-color: #1c1c1e;
-  border-width: 1px;
-  border-color: rgba(255, 255, 255, 0.08);
-  border-style: solid;
-  justify-content: center;
-  align-items: center;
-  padding-left: 30px;
-  padding-right: 30px;
-  margin-left: 10px;
-  margin-right: 10px;
-}
-
-.pill-on {
-  background-color: #0A84FF;
-  border-color: #0A84FF;
-}
-
-.pill-txt {
-  font-size: 22px;
-  color: rgba(235, 235, 245, 0.75);
-}
-
-.pill-txt-on {
-  color: #ffffff;
-  font-weight: bold;
 }
 
 .save-btn {
@@ -353,7 +307,6 @@ export default {
   .head,
   .ed-label,
   .ed-picker,
-  .pills,
   .save-btn,
   .del-btn {
     width: 386px;
