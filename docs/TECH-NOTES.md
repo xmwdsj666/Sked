@@ -113,3 +113,7 @@
 
 - 现象：作息面板的 名称/开始/结束/类型 四个静态按钮绑 onclick="onSeg()"，编译产物为 onSeg(this.)；非 for 元素上 this. 是 undefined，点击后 segSel=undefined，四个条件分支全灭、picker 整块卸载——表现为『点击无反应』『滚轮字段丢失』。
 - 规则：/ 只在 for 循环内可用；静态多按钮一律用独立无参处理函数（onSegName/onSegStart/...，同 onPrevDay 模式），不做 onclick 字面量传参依赖。
+## 6k. 编辑表单禁用「遮罩面板 + 条件挂载 picker」：一律独立路由页 + 控件全静态常驻（真机卡死换实现）
+
+- 现象：作息编辑用 absolute 遮罩面板 + seg 切换 if 挂载 picker，真机点击即卡死（模拟器可复现层级/焦点异常）。
+- 规则：编辑表单一律独立路由页（router.push 传 id 参数），picker 等控件全部静态常驻、无条件分支；草稿字段平铺在 data（pName/pStart/...），不用嵌套对象绑定；保存/删除后 router.back()。遮罩面板只允许放按钮/输入框等无滚轮控件（Edit 选择课程面板）。

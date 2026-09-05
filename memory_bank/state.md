@@ -1,4 +1,4 @@
-阶段:九/九 | 任务:修复课程保存丢失+作息页面板式重构 | 进度:8/8 | 下步:真机验证持久化 | 暂停:无
+阶段:十/十 | 任务:作息编辑改独立路由页（真机卡死换实现）| 进度:5/5 | 下步:真机回归验证 | 暂停:无
 
 ## 快照
 - 项目：sked（BlueOS 手表课表应用，原名高中课表/blueos-timetable，圆屏+方屏 466）
@@ -8,11 +8,11 @@
 1. API 双命名空间兼容层（helper/sys.js），require 一律 try/catch 双回退（真机可能抛错）；manifest 双套 feature 并行声明。
 2. designWidth 466；deviceTypeList watch-round + watch-square。
 3. 【加固】持久层：主存 value 一律 JSON 字符串（getSync 读出 parse，兼容旧对象）；storage.set 无同步形态、必须带 fail 上报；快照由 app.ux onCreate primeSnapshot 预热（readText 仅异步）；getSync 异常（瞬态）不重置主存。
-4. 页面 6 个：Home(singleTask)/Week/Edit/Settings/Periods/Countdowns。
+4. 页面 7 个：Home(singleTask)/Week/Edit/Settings/Periods/PeriodEdit/Countdowns。
 5. 【新】单双周功能已删除（修正案 #3）；courses 条目={subjectId,periodId}。
 6. 【新】subjects 支持自定义科目（custom:true，同名复用，CUSTOM_COLORS 轮换取色）。
 7. 【新】编辑交互统一『草稿+显式保存』：Edit 选择课程面板与 Periods 编辑时段面板均为底部面板（absolute+.page relative），点行弹面板→草稿修改→『保存』写入+toast；清空/删除即时生效。
-8. 【新】面板 picker 规则：同一面板同时只显示一个 picker（seg 字段选择或 if 展开）；isValidPeriodRange 强制开始<结束，sanitize 丢弃 start>=end 坏时段。
+8. 【新】picker 规则：编辑表单一律独立路由页 + 控件全静态常驻（PeriodEdit），禁遮罩面板条件挂载 picker（真机卡死）；遮罩面板仅放按钮/输入框（Edit 选择课程面板）。保存显式按钮 + isValidPeriodRange 校验。
 
 ## 完成证据
 - 单测 29/29（新增 store 注入式 5 项：往返/快照恢复/瞬态异常不重置/损坏重置/旧对象兼容；核心时段校验 2 项）

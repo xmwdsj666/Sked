@@ -31,6 +31,7 @@
       "pages/Edit": { "component": "index" },
       "pages/Settings": { "component": "index" },
       "pages/Periods": { "component": "index" },
+      "pages/PeriodEdit": { "component": "index" },
       "pages/Countdowns": { "component": "index" }
     }
   },

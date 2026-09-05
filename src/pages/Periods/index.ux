@@ -21,72 +21,19 @@
         <div class="gap"></div>
       </div>
     </scroll>
-
-    <!-- 编辑时段面板：草稿修改，点「保存」才写入 -->
-    <div if="{{panelShow}}" class="mask">
-      <div class="panel">
-        <div class="panel-head">
-          <div class="back press" onclick="onPanelClose">
-            <text class="back-txt">‹</text>
-          </div>
-          <text class="panel-title">编辑时段</text>
-          <div class="head-spacer"></div>
-          <text class="del-link press" onclick="onDelete">删除</text>
-        </div>
-
-        <!-- 字段选择：面板同一时刻只显示一个 picker；独立 if 分支（不用 elif 链） -->
-        <div class="seg">
-          <div class="seg-btn {{segSel === 0 ? 'seg-on' : ''}}" onclick="onSegName">
-            <text class="seg-txt">名称</text>
-          </div>
-          <div class="seg-btn {{segSel === 1 ? 'seg-on' : ''}}" onclick="onSegStart">
-            <text class="seg-txt">开始</text>
-          </div>
-          <div class="seg-btn {{segSel === 2 ? 'seg-on' : ''}}" onclick="onSegEnd">
-            <text class="seg-txt">结束</text>
-          </div>
-          <div class="seg-btn {{segSel === 3 ? 'seg-on' : ''}}" onclick="onSegKind">
-            <text class="seg-txt">类型</text>
-          </div>
-        </div>
-
-        <div class="field-box">
-          <picker if="{{segSel === 0}}" class="ed-picker" type="text" range="{{nameRange}}" selected="{{nameSel}}" onchange="onNamePick"></picker>
-          <picker if="{{segSel === 1}}" class="ed-picker" type="time" format="HH:mm" selected="{{draft.start}}" onchange="onStartPick"></picker>
-          <picker if="{{segSel === 2}}" class="ed-picker" type="time" format="HH:mm" selected="{{draft.end}}" onchange="onEndPick"></picker>
-          <div if="{{segSel === 3}}" class="kind-row">
-            <div class="pill {{draft.type === 'class' ? 'pill-on' : ''}}" onclick="onKindClass">
-              <text class="pill-txt {{draft.type === 'class' ? 'pill-txt-on' : ''}}">课程</text>
-            </div>
-            <div class="pill {{draft.type === 'break' ? 'pill-on' : ''}}" onclick="onKindBreak">
-              <text class="pill-txt {{draft.type === 'break' ? 'pill-txt-on' : ''}}">休息</text>
-            </div>
-          </div>
-        </div>
-
-        <div class="save-btn press" onclick="onSave">
-          <text class="save-txt">保存</text>
-        </div>
-      </div>
-    </div>
   </div>
 </template>
 
 <script>
+/**
+ * 作息时间列表页：点击/新增均跳转独立编辑页（PeriodEdit）。
+ */
 import sys from '../../helper/sys.js'
-import { load, getData, save } from '../../store/index.js'
-import { genId, PERIOD_NAME_PRESETS } from '../../core/defaults.js'
-import { isValidPeriodRange } from '../../core/timetable.js'
+import { load, getData } from '../../store/index.js'
 
 export default {
   data: {
-    rows: [],
-    panelShow: false,
-    isNew: false,
-    segSel: 0,
-    nameRange: PERIOD_NAME_PRESETS,
-    nameSel: 0,
-    draft: { id: '', name: '', start: '08:00', end: '08:45', type: 'class' }
+    rows: []
   },
 
   onInit() {
@@ -123,149 +70,15 @@ export default {
     this.rows = rows
   },
 
-  openPanel(draft, isNew) {
-    this.draft = draft
-    this.isNew = isNew
-    this.segSel = 0
-    this.nameSel = 0
-    for (let j = 0; j < this.nameRange.length; j++) {
-      if (this.nameRange[j] === draft.name) { this.nameSel = j; break }
-    }
-    this.panelShow = true
-  },
-
   onRowTap(idx) {
     if (idx === undefined || !this.rows[idx]) return
-    const item = this.rows[idx]
-    this.openPanel({
-      id: item.id,
-      name: item.name,
-      start: item.start,
-      end: item.end,
-      type: item.kindColor === '#0A84FF' ? 'class' : 'break'
-    }, false)
     sys.vibrateShort()
+    sys.router().push({ uri: '/pages/PeriodEdit', params: { id: this.rows[idx].id } })
   },
 
   onAdd() {
-    this.openPanel({
-      id: genId(),
-      name: '自习',
-      start: '21:00',
-      end: '21:45',
-      type: 'class'
-    }, true)
     sys.vibrateShort()
-  },
-
-  onSegName() {
-    this.segSel = 0
-    sys.vibrateShort()
-  },
-
-  onSegStart() {
-    this.segSel = 1
-    sys.vibrateShort()
-  },
-
-  onSegEnd() {
-    this.segSel = 2
-    sys.vibrateShort()
-  },
-
-  onSegKind() {
-    this.segSel = 3
-    sys.vibrateShort()
-  },
-
-  onPanelClose() {
-    this.panelShow = false
-  },
-
-  onNamePick(e) {
-    if (!e) return
-    this.draft.name = e.newValue
-    for (let i = 0; i < this.nameRange.length; i++) {
-      if (this.nameRange[i] === e.newValue) { this.nameSel = i; break }
-    }
-  },
-
-  onStartPick(e) {
-    if (!e) return
-    this.draft.start = (e.hour < 10 ? '0' : '') + e.hour + ':' + (e.minute < 10 ? '0' : '') + e.minute
-  },
-
-  onEndPick(e) {
-    if (!e) return
-    this.draft.end = (e.hour < 10 ? '0' : '') + e.hour + ':' + (e.minute < 10 ? '0' : '') + e.minute
-  },
-
-  onKindClass() {
-    this.draft.type = 'class'
-    sys.vibrateShort()
-  },
-
-  onKindBreak() {
-    this.draft.type = 'break'
-    sys.vibrateShort()
-  },
-
-  onSave() {
-    const d = this.draft
-    if (!d.name) { sys.toast('请设置名称'); return }
-    if (!isValidPeriodRange(d.start, d.end)) {
-      sys.toast('开始时间需早于结束时间')
-      return
-    }
-    const st = getData()
-    if (!st) return
-    let p = null
-    for (let i = 0; i < st.periods.length; i++) {
-      if (st.periods[i].id === d.id) { p = st.periods[i]; break }
-    }
-    if (!p) {
-      p = { id: d.id }
-      st.periods.push(p)
-    }
-    p.name = d.name
-    p.start = d.start
-    p.end = d.end
-    const prevType = p.type
-    p.type = d.type
-    // 变成休息的时段不再承载课程，清理引用
-    if (prevType === 'class' && d.type === 'break') {
-      for (const day in st.courses) {
-        const arr = st.courses[day]
-        for (let i = arr.length - 1; i >= 0; i--) {
-          if (arr[i].periodId === d.id) arr.splice(i, 1)
-        }
-      }
-    }
-    const ok = save(st)
-    this.panelShow = false
-    sys.toast(ok ? '已保存' : '保存失败，请重试')
-    sys.vibrateShort()
-    this.refresh()
-  },
-
-  onDelete() {
-    const st = getData()
-    const d = this.draft
-    if (!st || !d.id) return
-    for (let i = st.periods.length - 1; i >= 0; i--) {
-      if (st.periods[i].id === d.id) st.periods.splice(i, 1)
-    }
-    for (const day in st.courses) {
-      const arr = st.courses[day]
-      for (let i = arr.length - 1; i >= 0; i--) {
-        if (arr[i].periodId === d.id) arr.splice(i, 1)
-      }
-    }
-    const ok = save(st)
-    this.panelShow = false
-    sys.toast(ok ? ('已删除 ' + d.name) : '删除失败，请重试')
-    sys.vibrateShort()
-    this.refresh()
+    sys.router().push({ uri: '/pages/PeriodEdit', params: { id: 'new' } })
   }
 }
 </script>
@@ -275,7 +88,6 @@ export default {
   width: 466px;
   height: 466px;
   background-color: #000000;
-  position: relative;
 }
 
 .scroll {
@@ -377,177 +189,6 @@ export default {
   height: 10px;
 }
 
-/* ===== 编辑时段面板 ===== */
-.mask {
-  position: absolute;
-  left: 0;
-  top: 0;
-  width: 466px;
-  height: 466px;
-  background-color: rgba(0, 0, 0, 0.78);
-}
-
-.panel {
-  position: absolute;
-  left: 0;
-  top: 76px;
-  width: 466px;
-  height: 390px;
-  background-color: #0c0c0e;
-  border-top-width: 1px;
-  border-top-color: rgba(255, 255, 255, 0.12);
-  border-top-style: solid;
-  border-top-left-radius: 30px;
-  border-top-right-radius: 30px;
-  flex-direction: column;
-  align-items: center;
-  padding-top: 16px;
-}
-
-.panel-head {
-  width: 382px;
-  height: 52px;
-  flex-direction: row;
-  align-items: center;
-}
-
-.back {
-  width: 52px;
-  height: 52px;
-  border-radius: 26px;
-  background-color: #232327;
-  justify-content: center;
-  align-items: center;
-}
-
-.back-txt {
-  font-size: 34px;
-  font-weight: bold;
-  color: #ffffff;
-}
-
-.panel-title {
-  margin-left: 16px;
-  font-size: 30px;
-  font-weight: bold;
-  color: #ffffff;
-}
-
-.head-spacer {
-  width: 66px;
-  height: 2px;
-}
-
-.del-link {
-  font-size: 24px;
-  font-weight: bold;
-  color: #FF453A;
-  padding-left: 10px;
-  padding-right: 4px;
-}
-
-.seg {
-  margin-top: 10px;
-  width: 382px;
-  height: 56px;
-  border-radius: 18px;
-  background-color: #17171b;
-  flex-direction: row;
-  align-items: center;
-  padding-left: 5px;
-  padding-right: 5px;
-}
-
-.seg-btn {
-  width: 90px;
-  height: 46px;
-  border-radius: 13px;
-  justify-content: center;
-  align-items: center;
-  margin-left: 1px;
-  margin-right: 1px;
-}
-
-.seg-on {
-  background-color: #2a2a31;
-}
-
-.seg-txt {
-  font-size: 21px;
-  color: rgba(235, 235, 245, 0.55);
-}
-
-.field-box {
-  margin-top: 8px;
-  width: 382px;
-  height: 170px;
-  justify-content: center;
-  align-items: center;
-}
-
-.ed-picker {
-  width: 340px;
-  height: 170px;
-  font-size: 22px;
-  color: rgba(235, 235, 245, 0.4);
-  selected-font-size: 32px;
-  selected-color: #ffffff;
-  selected-background-color: rgba(10, 132, 255, 0.15);
-  linecolor: #26262c;
-}
-
-.kind-row {
-  flex-direction: row;
-  justify-content: center;
-  align-items: center;
-}
-
-.pill {
-  height: 56px;
-  border-radius: 28px;
-  background-color: #1c1c1e;
-  border-width: 1px;
-  border-color: rgba(255, 255, 255, 0.08);
-  border-style: solid;
-  justify-content: center;
-  align-items: center;
-  padding-left: 32px;
-  padding-right: 32px;
-  margin-left: 10px;
-  margin-right: 10px;
-}
-
-.pill-on {
-  background-color: #0A84FF;
-  border-color: #0A84FF;
-}
-
-.pill-txt {
-  font-size: 23px;
-  color: rgba(235, 235, 245, 0.75);
-}
-
-.pill-txt-on {
-  color: #ffffff;
-  font-weight: bold;
-}
-
-.save-btn {
-  margin-top: 10px;
-  width: 382px;
-  height: 60px;
-  border-radius: 16px;
-  background-color: #0A84FF;
-  justify-content: center;
-  align-items: center;
-}
-
-.save-txt {
-  font-size: 25px;
-  font-weight: bold;
-  color: #ffffff;
-}
-
 .press:active {
   opacity: 0.72;
 }
@@ -563,13 +204,6 @@ export default {
   .list,
   .prow {
     width: 386px;
-  }
-  .panel-head,
-  .seg,
-  .field-box,
-  .ed-picker,
-  .save-btn {
-    width: 370px;
   }
 }
 
