@@ -56,6 +56,8 @@ export default {
     pName: '',
     pStart: '08:00',
     pEnd: '08:45',
+    startInit: '08:00',
+    endInit: '08:45',
     pType: 'class'
   },
 
@@ -75,6 +77,8 @@ export default {
       this.pName = '自习'
       this.pStart = '21:00'
       this.pEnd = '21:45'
+      this.startInit = this.pStart
+      this.endInit = this.pEnd
       this.pType = 'class'
     } else {
       let p = null
@@ -89,6 +93,8 @@ export default {
       this.pName = p.name
       this.pStart = p.start
       this.pEnd = p.end
+      this.startInit = p.start
+      this.endInit = p.end
       this.pType = p.type
     }
     for (let j = 0; j < this.nameRange.length; j++) {
@@ -101,9 +107,6 @@ export default {
   onNamePick(e) {
     if (!e) return
     this.pName = e.newValue
-    for (let i = 0; i < this.nameRange.length; i++) {
-      if (this.nameRange[i] === e.newValue) { this.nameSel = i; break }
-    }
   },
 
   onStartPick(e) {
@@ -119,7 +122,6 @@ export default {
   onTypePick(e) {
     if (!e) return
     this.pType = e.newValue === '休息' ? 'break' : 'class'
-    this.typeSel = e.newValue === '休息' ? 1 : 0
   },
 
   onSave() {
