@@ -16,10 +16,16 @@
         <picker class="ed-picker" type="text" range="{{nameRange}}" selected="{{nameSel}}" onchange="onNamePick"></picker>
 
         <text class="ed-label">开始时间</text>
-        <picker class="ed-picker" type="time" format="HH:mm" selected="{{pStart}}" onchange="onStartPick"></picker>
+        <div class="t-row">
+          <picker class="ed-picker ed-half" type="text" range="{{startHRange}}" selected="{{startSelH}}" onchange="onStartH"></picker>
+          <picker class="ed-picker ed-half" type="text" range="{{startMRange}}" selected="{{startSelM}}" onchange="onStartM"></picker>
+        </div>
 
         <text class="ed-label">结束时间</text>
-        <picker class="ed-picker" type="time" format="HH:mm" selected="{{pEnd}}" onchange="onEndPick"></picker>
+        <div class="t-row">
+          <picker class="ed-picker ed-half" type="text" range="{{endHRange}}" selected="{{endSelH}}" onchange="onEndH"></picker>
+          <picker class="ed-picker ed-half" type="text" range="{{endMRange}}" selected="{{endSelM}}" onchange="onEndM"></picker>
+        </div>
 
         <div class="save-btn press" onclick="onSave">
           <text class="save-txt">保存</text>
@@ -39,11 +45,18 @@
  * 时段编辑页（独立路由页，替代原底部面板）：
  * 全部控件静态常驻，无条件挂载/遮罩层——规避真机点击卡死问题。
  * 草稿字段全部平铺在 data（pName/pStart/pEnd/pType），保存才写入 store。
+ * 时间字段不用 type="time" picker（关联 deliverPositionEvent 投递失败），
+ * 改为与名称同形态的单列文本 picker（时/分双列，条目自带「时/分」单位）。
  */
 import sys from '../../helper/sys.js'
 import { load, getData, save, setNotice } from '../../store/index.js'
 import { genId, PERIOD_NAME_PRESETS } from '../../core/defaults.js'
 import { isValidPeriodRange } from '../../core/timetable.js'
+
+const HOUR_ITEMS = []
+const MINUTE_ITEMS = []
+for (let i = 0; i < 24; i++) HOUR_ITEMS.push((i < 10 ? '0' : '') + i + '时')
+for (let i = 0; i < 60; i++) MINUTE_ITEMS.push((i < 10 ? '0' : '') + i + '分')
 
 export default {
   data: {
@@ -51,6 +64,14 @@ export default {
     isNew: false,
     nameRange: PERIOD_NAME_PRESETS,
     nameSel: 0,
+    startHRange: HOUR_ITEMS,
+    startMRange: MINUTE_ITEMS,
+    endHRange: HOUR_ITEMS,
+    endMRange: MINUTE_ITEMS,
+    startSelH: 8,
+    startSelM: 0,
+    endSelH: 21,
+    endSelM: 45,
     typeRange: ['课程', '休息'],
     typeSel: 0,
     pName: '',
@@ -97,6 +118,11 @@ export default {
       this.endInit = p.end
       this.pType = p.type
     }
+    // range 从 00 开始递增，条目下标即数值；selected 只作初始定位，change 不回写
+    this.startSelH = parseInt(this.pStart.slice(0, 2))
+    this.startSelM = parseInt(this.pStart.slice(3, 5))
+    this.endSelH = parseInt(this.pEnd.slice(0, 2))
+    this.endSelM = parseInt(this.pEnd.slice(3, 5))
     for (let j = 0; j < this.nameRange.length; j++) {
       if (this.nameRange[j] === this.pName) { this.nameSel = j; break }
     }
@@ -109,14 +135,32 @@ export default {
     this.pName = e.newValue
   },
 
-  onStartPick(e) {
+  onStartH(e) {
     if (!e) return
-    this.pStart = (e.hour < 10 ? '0' : '') + e.hour + ':' + (e.minute < 10 ? '0' : '') + e.minute
+    const v = parseInt(e.newValue)
+    if (isNaN(v) || v < 0 || v > 23) return
+    this.pStart = (v < 10 ? '0' : '') + v + this.pStart.slice(2, 5)
   },
 
-  onEndPick(e) {
+  onStartM(e) {
     if (!e) return
-    this.pEnd = (e.hour < 10 ? '0' : '') + e.hour + ':' + (e.minute < 10 ? '0' : '') + e.minute
+    const v = parseInt(e.newValue)
+    if (isNaN(v) || v < 0 || v > 59) return
+    this.pStart = this.pStart.slice(0, 3) + (v < 10 ? '0' : '') + v
+  },
+
+  onEndH(e) {
+    if (!e) return
+    const v = parseInt(e.newValue)
+    if (isNaN(v) || v < 0 || v > 23) return
+    this.pEnd = (v < 10 ? '0' : '') + v + this.pEnd.slice(2, 5)
+  },
+
+  onEndM(e) {
+    if (!e) return
+    const v = parseInt(e.newValue)
+    if (isNaN(v) || v < 0 || v > 59) return
+    this.pEnd = this.pEnd.slice(0, 3) + (v < 10 ? '0' : '') + v
   },
 
   onTypePick(e) {
@@ -256,6 +300,20 @@ export default {
   linecolor: #26262c;
 }
 
+.t-row {
+  margin-top: 4px;
+  width: 370px;
+  height: 300px;
+  flex-direction: row;
+}
+
+.ed-half {
+  margin-top: 0;
+  width: 185px;
+  height: 300px;
+  selected-font-size: 30px;
+}
+
 .save-btn {
   margin-top: 18px;
   width: 370px;
@@ -310,9 +368,13 @@ export default {
   .head,
   .ed-label,
   .ed-picker,
+  .t-row,
   .save-btn,
   .del-btn {
     width: 386px;
+  }
+  .ed-half {
+    width: 193px;
   }
 }
 

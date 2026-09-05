@@ -32,3 +32,9 @@
 - getSync 异常≠数据损坏，禁止在 repaired 分支无条件重置主存
 - 事件冒泡无法阻断：面板不放遮罩点击关闭，用面板内返回键
 - npm test 指向具体文件列表；字符串替换注意保留媒体查询闭合 }
+
+
+## 更新 2026-09-06 02:20
+- 用户否决步进按钮兜底 → 时间字段改「文本型时/分双列 picker」（与名称同形态，无 loop/≥300px/不回写），弃用 type=time。
+- 构建产物断言：无 type=time 残留、4 个 change handler 在、无 onStartPick 残留；测试 29/29；新包 dist/com.qwq.sked.debug.1.0.0.rpk (02:20, 109277B)。
+- 待用户在干净 Studio（仅开 Sked）验证：滚时/分列 → 选中值亮白、无 deliverPositionEvent 报错。

@@ -125,4 +125,12 @@
 
 - 现象：picker 引擎错误清零后仍「点了没反应」时，模拟器日志每秒连发 `FrameRenderElement deliverPositionEvent` 错误——交互位置事件未能投递到组件。
 - 关联因素（按嫌疑排序）：picker loop="true"（新引入后出现，已回滚）；高度 260px（已回滚 300px）；**跨工程污染**——模拟器多次读取另一项目 blueos-dict 的 build 文件并崩溃（0xC0000005），Studio 预览可能串项目，验证前先重启 Studio 确认只开一个工程。
-- 若回滚后仍复现：弃用时间 picker，改 ± 步进按钮方案。
+- 若回滚后仍复现：弃用 `type="time"` picker，改用与名称同形态的**单列文本 picker 拼时间**（已实施，见 6n）。
+
+## 6n. 时间选择弃用 type="time" picker，改文本型时/分双列（最终方案）
+
+- 动机：`deliverPositionEvent` 连发与 `type="time"` 专用 picker 时间线重合；且 time picker 的选中项高亮带、行高、选中字号全部引擎内置写死，之前多次「选中色淡/错位」问题也源于此，样式不可控。
+- 做法：开始/结束各一排 `type="text"` 双列 picker——「时」列 00时~23时、「分」列 00分~59分（条目自带单位字样）。与「名称」picker 完全同形态（无 loop、≥300px、不回写 selected），即真机已验证的渲染路径。
+- 要点：range 下标即数值，`selected` 只在 onReady 定一次初始位；change 回调只更新草稿 `pStart/pEnd` 字符串（slice 拼接），绝不回写 selector 下标——遵守 6l。
+- 双列宽度：内容宽 370px 下每列 185px，方屏 386px 下 193px；双列时选中字号降为 30px（单列 36px），防拥挤。
+- 收益：时间字段不再依赖 time 组件；全页四个 picker 全部是同一已验证形态，排障面收敛到 1 类组件。
