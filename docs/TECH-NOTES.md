@@ -109,3 +109,7 @@
 - 官方 set/getSync 的 value 名义支持 Object/Array，但真机固件序列化行为不一；本工程统一 JSON.stringify 写入、读出后 parse（兼容旧对象形态）。
 - set 需带 fail 回调；persist 返回成败，失败 toast『保存失败，请重试』，禁止静默吞错。
 - getSync 抛异常≠数据损坏：瞬态故障时只用内存数据、不重置主存（防误清空放大）。
+## 6j.  仅存在于 for 循环作用域：静态元素 onclick 传  = undefined（实测踩坑）
+
+- 现象：作息面板的 名称/开始/结束/类型 四个静态按钮绑 onclick="onSeg()"，编译产物为 onSeg(this.)；非 for 元素上 this. 是 undefined，点击后 segSel=undefined，四个条件分支全灭、picker 整块卸载——表现为『点击无反应』『滚轮字段丢失』。
+- 规则：/ 只在 for 循环内可用；静态多按钮一律用独立无参处理函数（onSegName/onSegStart/...，同 onPrevDay 模式），不做 onclick 字面量传参依赖。

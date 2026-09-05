@@ -34,31 +34,31 @@
           <text class="del-link press" onclick="onDelete">删除</text>
         </div>
 
-        <!-- 字段选择：面板同一时刻只显示一个 picker -->
+        <!-- 字段选择：面板同一时刻只显示一个 picker；独立 if 分支（不用 elif 链） -->
         <div class="seg">
-          <div class="seg-btn {{segSel === 0 ? 'seg-on' : ''}}" onclick="onSeg($idx)">
+          <div class="seg-btn {{segSel === 0 ? 'seg-on' : ''}}" onclick="onSegName">
             <text class="seg-txt">名称</text>
           </div>
-          <div class="seg-btn {{segSel === 1 ? 'seg-on' : ''}}" onclick="onSeg($idx)">
+          <div class="seg-btn {{segSel === 1 ? 'seg-on' : ''}}" onclick="onSegStart">
             <text class="seg-txt">开始</text>
           </div>
-          <div class="seg-btn {{segSel === 2 ? 'seg-on' : ''}}" onclick="onSeg($idx)">
+          <div class="seg-btn {{segSel === 2 ? 'seg-on' : ''}}" onclick="onSegEnd">
             <text class="seg-txt">结束</text>
           </div>
-          <div class="seg-btn {{segSel === 3 ? 'seg-on' : ''}}" onclick="onSeg($idx)">
+          <div class="seg-btn {{segSel === 3 ? 'seg-on' : ''}}" onclick="onSegKind">
             <text class="seg-txt">类型</text>
           </div>
         </div>
 
         <div class="field-box">
           <picker if="{{segSel === 0}}" class="ed-picker" type="text" range="{{nameRange}}" selected="{{nameSel}}" onchange="onNamePick"></picker>
-          <picker elif="{{segSel === 1}}" class="ed-picker" type="time" format="HH:mm" selected="{{draft.start}}" onchange="onStartPick"></picker>
-          <picker elif="{{segSel === 2}}" class="ed-picker" type="time" format="HH:mm" selected="{{draft.end}}" onchange="onEndPick"></picker>
-          <div elif="{{segSel === 3}}" class="kind-row">
-            <div class="pill {{draft.type === 'class' ? 'pill-on' : ''}}" onclick="onKind('class')">
+          <picker if="{{segSel === 1}}" class="ed-picker" type="time" format="HH:mm" selected="{{draft.start}}" onchange="onStartPick"></picker>
+          <picker if="{{segSel === 2}}" class="ed-picker" type="time" format="HH:mm" selected="{{draft.end}}" onchange="onEndPick"></picker>
+          <div if="{{segSel === 3}}" class="kind-row">
+            <div class="pill {{draft.type === 'class' ? 'pill-on' : ''}}" onclick="onKindClass">
               <text class="pill-txt {{draft.type === 'class' ? 'pill-txt-on' : ''}}">课程</text>
             </div>
-            <div class="pill {{draft.type === 'break' ? 'pill-on' : ''}}" onclick="onKind('break')">
+            <div class="pill {{draft.type === 'break' ? 'pill-on' : ''}}" onclick="onKindBreak">
               <text class="pill-txt {{draft.type === 'break' ? 'pill-txt-on' : ''}}">休息</text>
             </div>
           </div>
@@ -158,8 +158,23 @@ export default {
     sys.vibrateShort()
   },
 
-  onSeg(idx) {
-    this.segSel = idx
+  onSegName() {
+    this.segSel = 0
+    sys.vibrateShort()
+  },
+
+  onSegStart() {
+    this.segSel = 1
+    sys.vibrateShort()
+  },
+
+  onSegEnd() {
+    this.segSel = 2
+    sys.vibrateShort()
+  },
+
+  onSegKind() {
+    this.segSel = 3
     sys.vibrateShort()
   },
 
@@ -185,8 +200,13 @@ export default {
     this.draft.end = (e.hour < 10 ? '0' : '') + e.hour + ':' + (e.minute < 10 ? '0' : '') + e.minute
   },
 
-  onKind(type) {
-    this.draft.type = type
+  onKindClass() {
+    this.draft.type = 'class'
+    sys.vibrateShort()
+  },
+
+  onKindBreak() {
+    this.draft.type = 'break'
     sys.vibrateShort()
   },
 
@@ -370,9 +390,9 @@ export default {
 .panel {
   position: absolute;
   left: 0;
-  top: 96px;
+  top: 76px;
   width: 466px;
-  height: 370px;
+  height: 390px;
   background-color: #0c0c0e;
   border-top-width: 1px;
   border-top-color: rgba(255, 255, 255, 0.12);
@@ -460,14 +480,14 @@ export default {
 .field-box {
   margin-top: 8px;
   width: 382px;
-  height: 140px;
+  height: 170px;
   justify-content: center;
   align-items: center;
 }
 
 .ed-picker {
   width: 340px;
-  height: 140px;
+  height: 170px;
   font-size: 22px;
   color: rgba(235, 235, 245, 0.4);
   selected-font-size: 32px;
