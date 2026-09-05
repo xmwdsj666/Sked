@@ -117,3 +117,7 @@
 
 - 现象：作息编辑用 absolute 遮罩面板 + seg 切换 if 挂载 picker，真机点击即卡死（模拟器可复现层级/焦点异常）。
 - 规则：编辑表单一律独立路由页（router.push 传 id 参数），picker 等控件全部静态常驻、无条件分支；草稿字段平铺在 data（pName/pStart/...），不用嵌套对象绑定；保存/删除后 router.back()。遮罩面板只允许放按钮/输入框等无滚轮控件（Edit 选择课程面板）。
+## 6l. picker 的 selected 是「初始位置」语义：change 回调里禁止回写绑定字段（实测踩坑）
+
+- 现象：时间滚轮滚动选中后，change 回调把新值写进 data，而该 data 正绑在 picker 的 selected 上——框架随即把值回写给 picker，引擎就地重置滚轴，触发 `adjust_scroller initial:-2147483648` 溢出：刚滚的那一列在选中带渲染成暗块/空块，未动过的列正常。
+- 规则：picker 的 selected 只做初始定位（进页面赋值一次）；change 回调只更新草稿字段（与 selected 绑定字段分离，如 startInit/pStart），滚轮位置由引擎自己维护。
