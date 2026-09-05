@@ -21,6 +21,9 @@
         <div class="gap"></div>
       </div>
     </scroll>
+    <div if="{{noticeShow}}" class="notice">
+      <text class="notice-txt">{{notice}}</text>
+    </div>
   </div>
 </template>
 
@@ -29,11 +32,13 @@
  * 作息时间列表页：点击/新增均跳转独立编辑页（PeriodEdit）。
  */
 import sys from '../../helper/sys.js'
-import { load, getData } from '../../store/index.js'
+import { load, getData, takeNotice } from '../../store/index.js'
 
 export default {
   data: {
-    rows: []
+    rows: [],
+    notice: '',
+    noticeShow: false
   },
 
   onInit() {
@@ -47,7 +52,21 @@ export default {
   },
 
   onShow() {
-    if (this._loaded) this.refresh()
+    if (!this._loaded) return
+    this.refresh()
+    const n = takeNotice()
+    if (n) {
+      this.notice = n
+      this.noticeShow = true
+      const self = this
+      if (this._nt) clearTimeout(this._nt)
+      this._nt = setTimeout(function () { self.noticeShow = false }, 1500)
+    }
+  },
+
+  onHide() {
+    if (this._nt) { clearTimeout(this._nt); this._nt = 0 }
+    this.noticeShow = false
   },
 
   refresh() {
@@ -187,6 +206,29 @@ export default {
 
 .gap {
   height: 10px;
+}
+
+.notice {
+  position: absolute;
+  left: 0;
+  top: 90px;
+  width: 466px;
+  justify-content: center;
+  align-items: center;
+}
+
+.notice-txt {
+  font-size: 20px;
+  color: #ffffff;
+  background-color: rgba(28, 28, 32, 0.95);
+  border-width: 1px;
+  border-color: rgba(255, 255, 255, 0.12);
+  border-style: solid;
+  border-radius: 18px;
+  padding-top: 10px;
+  padding-bottom: 10px;
+  padding-left: 22px;
+  padding-right: 22px;
 }
 
 .press:active {

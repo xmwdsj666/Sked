@@ -7,6 +7,11 @@
             "width": 390,
             "height": 450,
             "label": "390*450"
+        },
+        "watch-round": {
+            "width": 466,
+            "height": 466,
+            "label": "466*466"
         }
     },
     "blue-os-previewer.otherSetting": ""

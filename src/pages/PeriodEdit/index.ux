@@ -41,7 +41,7 @@
  * 草稿字段全部平铺在 data（pName/pStart/pEnd/pType），保存才写入 store。
  */
 import sys from '../../helper/sys.js'
-import { load, getData, save } from '../../store/index.js'
+import { load, getData, save, setNotice } from '../../store/index.js'
 import { genId, PERIOD_NAME_PRESETS } from '../../core/defaults.js'
 import { isValidPeriodRange } from '../../core/timetable.js'
 
@@ -154,7 +154,7 @@ export default {
       }
     }
     const ok = save(st)
-    sys.toast(ok ? '已保存' : '保存失败，请重试')
+    if (ok) setNotice('已保存'); else sys.toast('保存失败，请重试')
     sys.vibrateShort()
     sys.router().back()
   },
@@ -172,7 +172,7 @@ export default {
       }
     }
     const ok = save(st)
-    sys.toast(ok ? '已删除' : '删除失败，请重试')
+    if (ok) setNotice('已删除'); else sys.toast('删除失败，请重试')
     sys.vibrateShort()
     sys.router().back()
   },
@@ -237,8 +237,9 @@ export default {
 .ed-label {
   margin-top: 10px;
   width: 370px;
-  font-size: 22px;
-  color: rgba(235, 235, 245, 0.5);
+  font-size: 26px;
+  font-weight: bold;
+  color: rgba(235, 235, 245, 0.85);
 }
 
 .ed-picker {
@@ -246,10 +247,10 @@ export default {
   width: 370px;
   height: 260px;
   font-size: 24px;
-  color: rgba(235, 235, 245, 0.4);
-  selected-font-size: 34px;
+  color: rgba(235, 235, 245, 0.3);
+  selected-font-size: 36px;
   selected-color: #ffffff;
-  selected-background-color: rgba(255, 255, 255, 0.08);
+  selected-background-color: rgba(255, 255, 255, 0.16);
   linecolor: #26262c;
 }
 

@@ -163,6 +163,17 @@ function safeParse(text) {
   }
 }
 
+/** 跨页轻提示：编辑页保存/删除后，返回的列表页自绘小横幅替代系统 Toast */
+let _notice = ''
+export function setNotice(text) {
+  _notice = String(text || '')
+}
+export function takeNotice() {
+  const n = _notice
+  _notice = ''
+  return n
+}
+
 /** 数据迁移预留：读出旧版本时在此补齐字段 */
 export function migrate(data) {
   if (!data.version) data.version = DATA_VERSION

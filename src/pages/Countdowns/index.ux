@@ -323,7 +323,7 @@ export default {
   color: rgba(235, 235, 245, 0.4);
   selected-font-size: 28px;
   selected-color: #ffffff;
-  selected-background-color: rgba(255, 255, 255, 0.08);
+  selected-background-color: rgba(255, 255, 255, 0.14);
   linecolor: #26262c;
 }
 
