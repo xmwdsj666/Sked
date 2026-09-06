@@ -26,6 +26,11 @@
           <text class="card-value">{{cdLabel}}</text>
         </div>
 
+        <div class="card press" onclick="goSync">
+          <text class="card-title">手机同步</text>
+          <text class="card-value">从手机导入 / 备份</text>
+        </div>
+
         <div class="card-danger press" onclick="onResetTap">
           <text class="card-title-danger">恢复默认数据</text>
         </div>
@@ -115,6 +120,11 @@ export default {
   goCountdowns() {
     sys.vibrateShort()
     sys.router().push({ uri: '/pages/Countdowns' })
+  },
+
+  goSync() {
+    sys.vibrateShort()
+    sys.router().push({ uri: '/pages/Sync' })
   },
 
   onResetTap() {

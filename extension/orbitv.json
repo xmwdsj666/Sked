@@ -1,0 +1,8 @@
+{
+  "schemaVersion": 1,
+  "appId": "com.qwq.sked",
+  "name": "课表助手",
+  "version": "1.0.0",
+  "entry": "index.html",
+  "service": "service.js"
+}

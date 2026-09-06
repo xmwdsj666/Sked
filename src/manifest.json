@@ -21,7 +21,9 @@
     { "name": "blueos.hardware.vibrator.vibrator" },
     { "name": "system.vibrator" },
     { "name": "blueos.app.appmanager.router" },
-    { "name": "system.router" }
+    { "name": "system.router" },
+    { "name": "blueos.network.fetch" },
+    { "name": "blueos.network.request" }
   ],
   "router": {
     "entry": "pages/Home",
@@ -32,7 +34,8 @@
       "pages/Settings": { "component": "index" },
       "pages/Periods": { "component": "index" },
       "pages/PeriodEdit": { "component": "index" },
-      "pages/Countdowns": { "component": "index" }
+      "pages/Countdowns": { "component": "index" },
+      "pages/Sync": { "component": "index" }
     }
   },
   "display": {

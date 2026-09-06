@@ -1,4 +1,4 @@
-阶段:十/十 | 任务:作息编辑改独立路由页（真机卡死换实现）| 进度:5/5 | 下步:真机回归验证 | 暂停:无
+阶段:五/五 | 任务:OrbitV 扩展程序（手机端编辑+备份导出）| 进度:5/5 | 下步:用户真机端到端验证 | 暂停:无
 
 ## 快照
 - 项目：sked（BlueOS 手表课表应用，原名高中课表/blueos-timetable，圆屏+方屏 466）
@@ -38,3 +38,10 @@
 - 用户否决步进按钮兜底 → 时间字段改「文本型时/分双列 picker」（与名称同形态，无 loop/≥300px/不回写），弃用 type=time。
 - 构建产物断言：无 type=time 残留、4 个 change handler 在、无 onStartPick 残留；测试 29/29；新包 dist/com.qwq.sked.debug.1.0.0.rpk (02:20, 109277B)。
 - 待用户在干净 Studio（仅开 Sked）验证：滚时/分列 → 选中值亮白、无 deliverPositionEvent 报错。
+
+
+## 更新 2026-09-06（扩展程序周期）
+- 手表端：src/common/orbitv SDK、app.ux 防御初始化（模拟器降级 null）、manifest +network.fetch/request + pages/Sync、Settings 入口；构建 0 错误，测试 29/29。
+- 手机端：extension/ 工程（service.js 双接口 + skedData 共享契约 + 四页面）；浏览器实测通过（新建课程/排课/时段校验/按天隔离）；修复 3 处 Options API 模板直引 import 的 bug（dayNames/colors/presets 需经 computed）。
+- 产物：extension/release/com.qwq.sked-1.0.0.ovpkg (94KB)；手表 dist/com.qwq.sked.debug.1.0.0.rpk。
+- 待用户真机验证：装 ovpkg 进轻腕 → 保持页面打开 → 手表同步页导入/备份。

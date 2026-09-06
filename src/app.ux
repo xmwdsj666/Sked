@@ -4,10 +4,23 @@
  * 注意：不要在模块加载或 onInit 之前调用 Feature API（编译期静态预渲染限制）。
  * onCreate 预热快照读取：file.readText 只有异步形态，启动期发起、
  * 回调完成后缓存到 store，供主存损坏时 load() 同步取用。
+ * OrbitV 客户端：createOrbitVClient 是纯函数（只拼 URL，不触引擎 API），
+ * 模块加载期创建安全；appId 用字面量（本应用包名固定），避免加载期调 app.getInfo。
+ * 模拟器/旧引擎缺失 network 模块时 require 会失败，整体 try/catch 降级为 null，
+ * Sync 页判空提示「当前设备不支持手机同步」。
  */
 import { primeSnapshot } from './store/index.js'
 
+let orbitv = null
+try {
+  const { createOrbitVClient } = require('./common/orbitv/index.js')
+  orbitv = createOrbitVClient({ appId: 'com.qwq.sked' })
+} catch (e) {
+  orbitv = null
+}
+
 export default {
+  orbitv,
   onCreate() {
     try {
       primeSnapshot()

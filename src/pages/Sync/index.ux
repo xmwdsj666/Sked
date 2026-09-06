@@ -1,0 +1,305 @@
+<template>
+  <div class="page">
+    <scroll class="scroll" scroll-y="true">
+      <div class="content">
+        <div class="head">
+          <div class="back press" onclick="onBack">
+            <text class="back-txt">‹</text>
+          </div>
+          <text class="head-title">手机同步</text>
+        </div>
+
+        <div class="status {{ok === true ? 'status-ok' : ''}} {{ok === false ? 'status-err' : ''}}">
+          <text class="status-txt">{{status}}</text>
+        </div>
+
+        <div class="btn press" onclick="onCheck">
+          <text class="btn-txt">检查连接</text>
+        </div>
+        <div class="btn btn-primary press" onclick="onImport">
+          <text class="btn-txt-strong">从手机导入</text>
+        </div>
+        <div class="btn btn-tonal press" onclick="onBackup">
+          <text class="btn-txt">备份到手机</text>
+        </div>
+
+        <text class="hint">导入以手机端为准并覆盖手表课表；备份把当前数据存到手机。操作时手机需保持 Sked 扩展程序页面打开。</text>
+        <div class="gap"></div>
+      </div>
+    </scroll>
+  </div>
+</template>
+
+<script>
+/**
+ * 手机同步页：与 OrbitV 扩展程序（手机端）交换课表数据。
+ * 通信方向铁律：一切由手表主动发起（拉取/上传），手机端被动应答。
+ * 客户端来自 app.ux 的防御性初始化，模拟器/旧引擎为 null 时降级提示。
+ * 数据契约：手机端 value 与手表 store 同构；导入统一过 sanitize 清洗再入库。
+ */
+import sys from '../../helper/sys.js'
+import { load, getData, save } from '../../store/index.js'
+import { makeDefaultData } from '../../core/defaults.js'
+import { sanitize } from '../../core/timetable.js'
+
+export default {
+  data: {
+    status: '未连接',
+    ok: null,
+    busy: false
+  },
+
+  onReady() {
+    load()
+  },
+
+  onBack() {
+    sys.router().back()
+  },
+
+  client() {
+    const def = this.$app && this.$app.$def
+    return def ? def.orbitv : null
+  },
+
+  setStatus(text, ok) {
+    this.status = text
+    this.ok = ok === true ? true : (ok === false ? false : null)
+  },
+
+  errText(e) {
+    const code = e && e.code ? String(e.code) : ''
+    if (code === 'APP_PAGE_NOT_OPEN') return '请先在手机上打开 Sked 扩展程序'
+    if (code === 'NOT_READY') return '手机端暂无数据'
+    if (code.indexOf('NETWORK_') === 0) return '无法连接手机：确认手表与手机已连接、轻腕 App 正在运行'
+    if (code.indexOf('HTTP_') === 0) return '手机端错误：' + ((e && e.message) || code)
+    if (code.indexOf('DOWNLOAD_') === 0 || code.indexOf('UPLOAD_') === 0) return '传输失败：' + ((e && e.message) || code)
+    return '同步失败：' + ((e && e.message) || (code || '未知错误'))
+  },
+
+  /** 检查连接 + 手机端数据概况（不写库） */
+  onCheck() {
+    const c = this.client()
+    if (!c) { this.setStatus('当前设备不支持手机同步', false); return }
+    if (this.busy) return
+    this.busy = true
+    this.setStatus('正在连接手机…', null)
+    c.http.request('/api/sked/timetable', { responseType: 'json', timeout: 15000 })
+      .then((res) => {
+        this.busy = false
+        const body = res && res.data
+        if (body && body.ok === true && body.value && typeof body.value === 'object') {
+          const v = body.value
+          const nP = Array.isArray(v.periods) ? v.periods.length : 0
+          let nC = 0
+          if (v.courses) {
+            for (const d in v.courses) {
+              if (Array.isArray(v.courses[d])) nC += v.courses[d].length
+            }
+          }
+          this.setStatus('连接正常：' + nP + ' 个时段 / ' + nC + ' 节课', true)
+        } else {
+          this.setStatus('连接正常，手机端暂无数据', true)
+        }
+      })
+      .catch((e) => {
+        this.busy = false
+        this.setStatus(this.errText(e), false)
+      })
+  },
+
+  /** 拉取手机端课表，清洗后覆盖本地 */
+  onImport() {
+    const c = this.client()
+    if (!c) { this.setStatus('当前设备不支持手机同步', false); return }
+    if (this.busy) return
+    this.busy = true
+    this.setStatus('正在从手机导入…', null)
+    c.http.request('/api/sked/timetable', { responseType: 'json', timeout: 15000 })
+      .then((res) => {
+        this.busy = false
+        const body = res && res.data
+        if (!body || body.ok !== true || !body.value || typeof body.value !== 'object') {
+          this.setStatus('手机端暂无数据，先在手机端编辑或备份', false)
+          return
+        }
+        const r = sanitize(body.value, makeDefaultData)
+        const st = getData()
+        if (!st) { this.setStatus('本地数据未就绪', false); return }
+        const okSave = save(r.data)
+        if (!okSave) { this.setStatus('保存失败，请重试', false); return }
+        sys.vibrateShort()
+        this.setStatus('已导入：' + r.data.subjects.length + ' 门课程 · ' + r.data.periods.length + ' 个时段', true)
+      })
+      .catch((e) => {
+        this.busy = false
+        this.setStatus(this.errText(e), false)
+      })
+  },
+
+  /** 当前数据快照上传手机（手机端页面随后可编辑/导出） */
+  onBackup() {
+    const c = this.client()
+    if (!c) { this.setStatus('当前设备不支持手机同步', false); return }
+    if (this.busy) return
+    const st = getData()
+    if (!st) { this.setStatus('本地数据未就绪', false); return }
+    this.busy = true
+    this.setStatus('正在备份到手机…', null)
+    c.http.request('/api/sked/timetable', {
+      method: 'POST',
+      responseType: 'json',
+      header: { 'Content-Type': 'application/json' },
+      data: JSON.stringify(st)
+    })
+      .then((res) => {
+        this.busy = false
+        const body = res && res.data
+        if (body && body.ok === true) {
+          sys.vibrateShort()
+          this.setStatus('已备份到手机，可在手机端编辑或导出', true)
+        } else {
+          this.setStatus('手机端接收失败', false)
+        }
+      })
+      .catch((e) => {
+        this.busy = false
+        this.setStatus(this.errText(e), false)
+      })
+  }
+}
+</script>
+
+<style>
+.page {
+  width: 466px;
+  height: 466px;
+  background-color: #000000;
+}
+
+.scroll {
+  width: 466px;
+  height: 466px;
+}
+
+.content {
+  width: 466px;
+  padding-left: 48px;
+  padding-right: 48px;
+  padding-top: 60px;
+  padding-bottom: 60px;
+  flex-direction: column;
+  align-items: center;
+}
+
+.head {
+  width: 370px;
+  height: 60px;
+  flex-direction: row;
+  align-items: center;
+}
+
+.back {
+  width: 52px;
+  height: 52px;
+  border-radius: 26px;
+  background-color: #232327;
+  justify-content: center;
+  align-items: center;
+}
+
+.back-txt {
+  font-size: 34px;
+  font-weight: bold;
+  color: #ffffff;
+}
+
+.head-title {
+  margin-left: 16px;
+  font-size: 30px;
+  font-weight: bold;
+  color: #ffffff;
+}
+
+.status {
+  margin-top: 16px;
+  width: 370px;
+  border-radius: 16px;
+  background-color: #1a1a1f;
+  padding: 14px 20px;
+}
+
+.status-ok {
+  background-color: rgba(48, 209, 88, 0.16);
+}
+
+.status-err {
+  background-color: rgba(255, 69, 58, 0.16);
+}
+
+.status-txt {
+  font-size: 20px;
+  color: #ffffff;
+}
+
+.btn {
+  margin-top: 12px;
+  width: 370px;
+  height: 60px;
+  border-radius: 16px;
+  background-color: #232327;
+  justify-content: center;
+  align-items: center;
+}
+
+.btn-primary {
+  background-color: #0A84FF;
+}
+
+.btn-tonal {
+  background-color: rgba(10, 132, 255, 0.22);
+}
+
+.btn-txt {
+  font-size: 24px;
+  color: rgba(235, 235, 245, 0.85);
+}
+
+.btn-txt-strong {
+  font-size: 24px;
+  font-weight: bold;
+  color: #ffffff;
+}
+
+.hint {
+  margin-top: 14px;
+  width: 370px;
+  font-size: 16px;
+  color: rgba(235, 235, 245, 0.35);
+  text-align: center;
+}
+
+.gap {
+  height: 10px;
+}
+
+.press:active {
+  opacity: 0.72;
+}
+
+/* 方屏适配：与全 App 一致的常规边距 */
+@media screen and (device: watch-square) {
+  .content {
+    padding-left: 40px;
+    padding-right: 40px;
+    padding-top: 36px;
+    padding-bottom: 40px;
+  }
+  .head,
+  .status,
+  .btn,
+  .hint {
+    width: 386px;
+  }
+}
+</style>

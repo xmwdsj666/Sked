@@ -53,3 +53,10 @@
 - **编辑交互重构**（参考用户提供的「轻课表」截图）：编辑页 = 「‹ 周X ›」切换条 + 「第N节 + 科目」按天列表；点行弹出底部「选择课程」面板——预设科目块、自定义课程块、自定义输入框 + 确定按钮、红色「清空当前」按钮。
 - **解封「自由科目增删」**：§4「不要求自由新增科目名」与 §5「明确不做：自由科目增删」修正为——允许在编辑面板新增自定义科目（同名复用、自动轮换取色、标记 custom）；科目不可删除（仅可清空某节课的安排）。
 - **数据模型变化**：courses 条目为 `{subjectId, periodId}`；subjects 条目新增可选 `custom: true` 标记；DATA_VERSION 仍为 1（sanitize 兼容读取旧数据）。
+
+
+## 修正案 #4（2026-09-06）：OrbitV 手机端扩展程序
+- 依据 bproject/ 两篇 OrbitV 文档制作手机端扩展程序（轻腕 App 内 Vue 3 工程，appId=com.qwq.sked 与手表配对）。
+- 功能（用户确认）：手机端编辑课表+作息、课表备份导出 JSON；手表端新增 Sync 页（从手机导入/备份到手机）。
+- 通信：手表主动发起（GET/POST /api/sked/timetable），手机被动应答；数据基准 ov.storage(sked.timetable) 与手表 store 同构，导入过 sanitize。
+- 交付：extension/ 工程（ovpkg）+ 手表端 SDK 接入 + docs/EXTENSION.md；端到端验证需用户真机（轻腕+手表）。
