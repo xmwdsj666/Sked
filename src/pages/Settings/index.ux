@@ -1,0 +1,284 @@
+<template>
+  <div class="page">
+    <scroll class="scroll" scroll-y="true">
+      <div class="content">
+        <text class="title">设置</text>
+
+        <div class="card press" onclick="onStartPick">
+          <text class="card-title">学期起始日</text>
+          <text class="card-value">{{startLabel}}</text>
+        </div>
+        <div if="{{startPicking}}" class="editor">
+          <picker class="ed-picker" type="date" start="2020-1-1" end="2035-12-31" selected="{{startVal}}" onchange="onStartChange"></picker>
+          <div class="done-btn press" onclick="onStartDone">
+            <text class="done-txt">完成</text>
+          </div>
+        </div>
+        <text class="hint">选开学第一周的任意一天，自动对齐周一</text>
+
+        <div class="card press" onclick="goPeriods">
+          <text class="card-title">作息时间</text>
+          <text class="card-value">{{periodLabel}}</text>
+        </div>
+
+        <div class="card press" onclick="goCountdowns">
+          <text class="card-title">考试与假期</text>
+          <text class="card-value">{{cdLabel}}</text>
+        </div>
+
+        <div class="card-danger press" onclick="onResetTap">
+          <text class="card-title-danger">恢复默认数据</text>
+        </div>
+
+        <text class="about">高中课表 v1.0.0 · BlueOS</text>
+        <div class="gap"></div>
+      </div>
+    </scroll>
+
+    <vw-alert if="{{alertShow}}" title="恢复默认" content="将清空课表、作息与倒计时，确认继续？" buttons="{{alertButtons}}" onconfirm="onAlertConfirm" oncancel="onAlertCancel"></vw-alert>
+  </div>
+</template>
+
+<script>
+import sys from '../../helper/sys.js'
+import { load, getData, save, reset } from '../../store/index.js'
+
+export default {
+  data: {
+    title: '设置',
+    startLabel: '',
+    startVal: '2026-9-1',
+    startPicking: false,
+    periodLabel: '',
+    cdLabel: '',
+    alertShow: false,
+    alertButtons: [
+      { eventType: 'cancel', type: 'plain', value: '取消', color: '#ffffff' },
+      { eventType: 'confirm', type: 'danger', value: '恢复默认', color: '#FF453A' }
+    ]
+  },
+
+  onInit() {
+    this._loaded = false
+  },
+
+  onReady() {
+    this._loaded = true
+    load()
+    this.refresh()
+  },
+
+  onShow() {
+    if (this._loaded) this.refresh()
+  },
+
+  refresh() {
+    if (!this._loaded) return
+    const st = getData()
+    if (!st) return
+    const p = String(st.semesterStart).split('-')
+    this.startLabel = parseInt(p[0], 10) + ' 年 ' + parseInt(p[1], 10) + ' 月 ' + parseInt(p[2], 10) + ' 日'
+    this.startVal = parseInt(p[0], 10) + '-' + parseInt(p[1], 10) + '-' + parseInt(p[2], 10)
+    const nClass = st.periods.filter(function (x) { return x.type === 'class' }).length
+    this.periodLabel = nClass + ' 节课'
+    this.cdLabel = st.countdowns.length === 0 ? '未设置' : (st.countdowns.length + ' 项')
+  },
+
+  onStartPick() {
+    sys.vibrateShort()
+    this.startPicking = !this.startPicking
+  },
+
+  onStartChange(e) {
+    // picker date 返回 {year, month, day}
+    const st = getData()
+    if (!st || !e) return
+    const y = e.year
+    const mo = e.month
+    const d = e.day
+    const pad = function (n) { return n < 10 ? '0' + n : '' + n }
+    st.semesterStart = y + '-' + pad(mo) + '-' + pad(d)
+    save(st)
+    this.refresh()
+  },
+
+  onStartDone() {
+    this.startPicking = false
+    sys.toast('已更新学期起始日')
+  },
+
+  goPeriods() {
+    sys.vibrateShort()
+    sys.router().push({ uri: '/pages/Periods' })
+  },
+
+  goCountdowns() {
+    sys.vibrateShort()
+    sys.router().push({ uri: '/pages/Countdowns' })
+  },
+
+  onResetTap() {
+    sys.vibrateShort()
+    this.alertShow = true
+  },
+
+  onAlertConfirm() {
+    this.alertShow = false
+    reset()
+    sys.toast('已恢复默认数据')
+    this.refresh()
+  },
+
+  onAlertCancel() {
+    this.alertShow = false
+  }
+}
+</script>
+
+<style>
+.page {
+  width: 466px;
+  height: 466px;
+  background-color: #000000;
+}
+
+.scroll {
+  width: 466px;
+  height: 466px;
+}
+
+.content {
+  width: 466px;
+  padding-left: 48px;
+  padding-right: 48px;
+  padding-top: 80px;
+  padding-bottom: 100px;
+  flex-direction: column;
+  align-items: center;
+}
+
+.title {
+  font-size: 34px;
+  font-weight: bold;
+  color: #ffffff;
+}
+
+.card {
+  margin-top: 18px;
+  width: 370px;
+  height: 92px;
+  border-radius: 24px;
+  border-width: 1px;
+  border-color: rgba(255, 255, 255, 0.07);
+  border-style: solid;
+  background: linear-gradient(to bottom right, #1d1d22, #141418);
+  flex-direction: column;
+  justify-content: center;
+  padding-left: 24px;
+  padding-right: 24px;
+}
+
+.card-title {
+  font-size: 22px;
+  color: rgba(235, 235, 245, 0.55);
+}
+
+.card-value {
+  margin-top: 6px;
+  font-size: 26px;
+  font-weight: bold;
+  color: #ffffff;
+}
+
+.card-danger {
+  margin-top: 18px;
+  width: 370px;
+  height: 76px;
+  border-radius: 24px;
+  border-width: 1px;
+  border-color: rgba(255, 69, 58, 0.4);
+  border-style: solid;
+  background: linear-gradient(to bottom right, #241416, #160d0e);
+  justify-content: center;
+  padding-left: 24px;
+}
+
+.card-title-danger {
+  font-size: 24px;
+  font-weight: bold;
+  color: #FF453A;
+}
+
+.editor {
+  margin-top: 10px;
+  width: 370px;
+  border-width: 1px;
+  border-color: rgba(10, 132, 255, 0.4);
+  border-style: solid;
+  background-color: #101014;
+  border-radius: 24px;
+  flex-direction: column;
+  align-items: center;
+  padding-top: 12px;
+  padding-bottom: 16px;
+}
+
+.ed-picker {
+  width: 330px;
+  height: 160px;
+  font-size: 22px;
+  color: rgba(235, 235, 245, 0.4);
+  selected-font-size: 32px;
+  selected-color: #ffffff;
+  selected-background-color: rgba(10, 132, 255, 0.15);
+  linecolor: #26262c;
+}
+
+.done-btn {
+  margin-top: 8px;
+  height: 44px;
+  border-radius: 22px;
+  background-color: #0A84FF;
+  justify-content: center;
+  align-items: center;
+  padding-left: 30px;
+  padding-right: 30px;
+}
+
+.done-txt {
+  font-size: 20px;
+  font-weight: bold;
+  color: #ffffff;
+}
+
+.hint {
+  margin-top: 8px;
+  font-size: 16px;
+  color: rgba(235, 235, 245, 0.35);
+}
+
+.about {
+  margin-top: 26px;
+  font-size: 16px;
+  color: rgba(235, 235, 245, 0.3);
+}
+
+.gap {
+  height: 10px;
+}
+
+.press:active {
+  opacity: 0.72;
+}
+
+/* 方屏适配：无弧形裁边，恢复常规边距 */
+@media screen and (device: watch-square) {
+  .content {
+    padding-left: 40px;
+    padding-right: 40px;
+    padding-top: 40px;
+    padding-bottom: 60px;
+  }
+}
+
+</style>

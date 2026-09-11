@@ -1,0 +1,269 @@
+<template>
+  <div class="page">
+    <scroll class="scroll" scroll-y="true">
+      <div class="content">
+        <text class="title">课表导入</text>
+        <text class="source">来自 {{ appName }}</text>
+
+        <div if="{{hasPending}}" class="card">
+          <div class="s-row">
+            <text class="s-label">学期起始</text>
+            <text class="s-value">{{summary.semesterStart}}</text>
+          </div>
+          <div class="s-row">
+            <text class="s-label">科目</text>
+            <text class="s-value">{{summary.subjectCount}} 门</text>
+          </div>
+          <div class="s-row">
+            <text class="s-label">时段</text>
+            <text class="s-value">{{summary.periodCount}} 个</text>
+          </div>
+          <div class="s-row">
+            <text class="s-label">课程</text>
+            <text class="s-value">{{summary.courseCount}} 节</text>
+          </div>
+          <div class="s-row">
+            <text class="s-label">倒计时</text>
+            <text class="s-value">{{summary.countdownCount}} 项</text>
+          </div>
+          <text class="hint">应用后将覆盖当前课表</text>
+        </div>
+
+        <div if="{{!hasPending}}" class="card">
+          <text class="empty-txt">暂无待导入数据</text>
+          <text class="hint">连接后由 orbitV 推送课表</text>
+        </div>
+
+        <div class="btn-row">
+          <div class="btn btn-ghost press" onclick="onReject">
+            <text class="btn-txt-ghost">忽略</text>
+          </div>
+          <div class="btn btn-primary press {{hasPending ? '' : 'btn-disabled'}}" onclick="onApply">
+            <text class="btn-txt-primary">应用</text>
+          </div>
+        </div>
+
+        <div class="gap"></div>
+      </div>
+    </scroll>
+  </div>
+</template>
+
+<script>
+import sys from '../../helper/sys.js'
+import bleServer from '../../ble/bleServer.js'
+import { load, save } from '../../store/index.js'
+
+export default {
+  data: {
+    appName: 'orbitV',
+    hasPending: false,
+    summary: {
+      semesterStart: '-',
+      subjectCount: 0,
+      periodCount: 0,
+      courseCount: 0,
+      countdownCount: 0
+    }
+  },
+
+  onInit() {
+    this._loaded = false
+    if (this.appName === undefined || this.appName === '') this.appName = 'orbitV'
+  },
+
+  onReady() {
+    this._loaded = true
+    this.refresh()
+  },
+
+  onShow() {
+    if (this._loaded) this.refresh()
+  },
+
+  refresh() {
+    if (!this._loaded) return
+    const p = bleServer.getPending()
+    this.hasPending = !!p
+    if (p) {
+      this.summary = {
+        semesterStart: p.summary.semesterStart || '-',
+        subjectCount: p.summary.subjectCount || 0,
+        periodCount: p.summary.periodCount || 0,
+        courseCount: p.summary.courseCount || 0,
+        countdownCount: p.summary.countdownCount || 0
+      }
+    }
+  },
+
+  onApply() {
+    if (!this.hasPending) return
+    const r = bleServer.confirmImport()
+    if (!r.ok) {
+      sys.toast('没有待导入数据')
+      this.refresh()
+      return
+    }
+    // envelope 里带 proto/app 元信息；写入本地存储
+    const data = r.data
+    if (r.envelope && typeof r.envelope.app === 'string') {
+      data.lastImportFrom = r.envelope.app
+    }
+    save(data)
+    sys.vibrateShort()
+    sys.toast('课表已导入')
+    this.backHome()
+  },
+
+  onReject() {
+    bleServer.rejectImport()
+    sys.toast('已忽略本次导入')
+    this.backHome()
+  },
+
+  backHome() {
+    sys.router().back()
+  }
+}
+</script>
+
+<style>
+.page {
+  width: 466px;
+  height: 466px;
+  background-color: #000000;
+}
+
+.scroll {
+  width: 466px;
+  height: 466px;
+}
+
+.content {
+  width: 466px;
+  padding-left: 48px;
+  padding-right: 48px;
+  padding-top: 80px;
+  padding-bottom: 100px;
+  flex-direction: column;
+  align-items: center;
+}
+
+.title {
+  font-size: 34px;
+  font-weight: bold;
+  color: #ffffff;
+}
+
+.source {
+  margin-top: 6px;
+  font-size: 19px;
+  color: rgba(235, 235, 245, 0.5);
+}
+
+.card {
+  margin-top: 18px;
+  width: 370px;
+  border-radius: 24px;
+  border-width: 1px;
+  border-color: rgba(255, 255, 255, 0.09);
+  border-style: solid;
+  background: linear-gradient(to bottom right, #1d1d22, #141418);
+  flex-direction: column;
+  align-items: center;
+  padding-top: 16px;
+  padding-bottom: 16px;
+}
+
+.s-row {
+  width: 330px;
+  height: 52px;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.s-label {
+  font-size: 20px;
+  color: rgba(235, 235, 245, 0.55);
+}
+
+.s-value {
+  font-size: 22px;
+  font-weight: bold;
+  color: #ffffff;
+}
+
+.hint {
+  margin-top: 8px;
+  font-size: 16px;
+  color: rgba(235, 235, 245, 0.35);
+}
+
+.empty-txt {
+  margin-top: 10px;
+  font-size: 21px;
+  color: rgba(235, 235, 245, 0.5);
+}
+
+.btn-row {
+  margin-top: 22px;
+  width: 370px;
+  height: 64px;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.btn {
+  width: 175px;
+  height: 60px;
+  border-radius: 30px;
+  justify-content: center;
+  align-items: center;
+}
+
+.btn-primary {
+  background-color: #0A84FF;
+}
+
+.btn-ghost {
+  border-width: 1px;
+  border-color: rgba(255, 255, 255, 0.18);
+  border-style: solid;
+  background-color: #1c1c1e;
+}
+
+.btn-txt-primary {
+  font-size: 22px;
+  font-weight: bold;
+  color: #ffffff;
+}
+
+.btn-txt-ghost {
+  font-size: 22px;
+  color: rgba(235, 235, 245, 0.75);
+}
+
+.btn-disabled {
+  opacity: 0.4;
+}
+
+.gap {
+  height: 10px;
+}
+
+.press:active {
+  opacity: 0.72;
+}
+
+/* 方屏适配：无弧形裁边，恢复常规边距 */
+@media screen and (device: watch-square) {
+  .content {
+    padding-left: 40px;
+    padding-right: 40px;
+    padding-top: 40px;
+    padding-bottom: 60px;
+  }
+}
+</style>

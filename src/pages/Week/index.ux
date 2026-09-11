@@ -1,0 +1,216 @@
+<template>
+  <div class="page">
+    <scroll class="scroll" scroll-y="true">
+      <div class="content">
+        <text class="title">{{ title }}</text>
+        <text class="subtitle">当前第 {{weekNo}} 周</text>
+
+        <div for="{{row in rows}}" tid="{{row.key}}" class="day-card {{row.isToday ? 'day-today' : ''}}" onclick="pickDay($idx)">
+          <div class="day-head">
+            <div class="day-head-left">
+              <text class="day-name {{row.isToday ? 'day-name-today' : ''}}">{{row.name}}</text>
+              <text if="{{row.isToday}}" class="today-badge">今天</text>
+            </div>
+            <text class="day-count">{{row.label}}</text>
+          </div>
+          <div class="dots-row">
+            <div for="{{d in row.dots}}" tid="{{d.key}}" class="mini-dot" style="background-color: {{d.color}};"></div>
+          </div>
+        </div>
+
+        <div class="gap"></div>
+      </div>
+    </scroll>
+  </div>
+</template>
+
+<script>
+import sys from '../../helper/sys.js'
+import { load, getData } from '../../store/index.js'
+import { WEEKDAY_ZH } from '../../core/defaults.js'
+import { weekNumberOf } from '../../core/timetable.js'
+
+export default {
+  data: {
+    title: '一周概览',
+    subtitle: '',
+    weekNo: 1,
+    rows: []
+  },
+
+  onInit() {
+    this._loaded = false
+  },
+
+  onReady() {
+    this._loaded = true
+    this.refresh()
+  },
+
+  onShow() {
+    if (this._loaded) this.refresh()
+  },
+
+  refresh() {
+    if (!this._loaded) return
+    const st = getData()
+    if (!st) return
+    const now = new Date()
+    const today = (now.getDay() + 6) % 7
+    const weekNo = weekNumberOf(st.semesterStart, now)
+    this.weekNo = weekNo >= 1 ? weekNo : 1
+
+    const subjMap = {}
+    for (let i = 0; i < st.subjects.length; i++) subjMap[st.subjects[i].id] = st.subjects[i]
+
+    const rows = []
+    for (let d = 0; d < 7; d++) {
+      const dayNo = d + 1
+      const all = (st.courses && st.courses[String(dayNo)]) || []
+      const visible = all.filter(function (c) {
+        return c && typeof c.subjectId === 'string' && typeof c.periodId === 'string'
+      })
+      const dots = []
+      for (let i = 0; i < visible.length; i++) {
+        const s = subjMap[visible[i].subjectId]
+        dots.push({ key: 'dt' + i + '-' + visible[i].subjectId, color: s ? s.color : '#8E8E93' })
+      }
+      rows.push({
+        key: 'day' + dayNo,
+        day: d,
+        name: WEEKDAY_ZH[d],
+        isToday: d === today,
+        dots: dots,
+        label: visible.length === 0 ? '无课' : (visible.length + ' 节')
+      })
+    }
+    this.rows = rows
+  },
+
+  pickDay(idx) {
+    if (idx === undefined || !this.rows[idx]) return
+    sys.vibrateShort()
+    sys.router().push({ uri: '/pages/Home', params: { day: String(this.rows[idx].day) } })
+  }
+}
+</script>
+
+<style>
+.page {
+  width: 466px;
+  height: 466px;
+  background-color: #000000;
+}
+
+.scroll {
+  width: 466px;
+  height: 466px;
+}
+
+.content {
+  width: 466px;
+  padding-left: 48px;
+  padding-right: 48px;
+  padding-top: 80px;
+  padding-bottom: 100px;
+  flex-direction: column;
+  align-items: center;
+}
+
+.title {
+  font-size: 34px;
+  font-weight: bold;
+  color: #ffffff;
+}
+
+.subtitle {
+  margin-top: 6px;
+  font-size: 20px;
+  color: rgba(235, 235, 245, 0.5);
+}
+
+.day-card {
+  margin-top: 16px;
+  width: 370px;
+  height: 92px;
+  border-radius: 24px;
+  border-width: 1px;
+  border-color: rgba(255, 255, 255, 0.07);
+  border-style: solid;
+  background: linear-gradient(to bottom right, #1d1d22, #141418);
+  flex-direction: column;
+  justify-content: center;
+  padding-left: 24px;
+  padding-right: 24px;
+}
+
+.day-today {
+  border-color: rgba(10, 132, 255, 0.7);
+}
+
+.day-head {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.day-head-left {
+  flex-direction: row;
+  align-items: center;
+}
+
+.day-name {
+  font-size: 26px;
+  font-weight: bold;
+  color: #ffffff;
+}
+
+.day-name-today {
+  color: #0A84FF;
+}
+
+.today-badge {
+  margin-left: 10px;
+  font-size: 15px;
+  color: #0A84FF;
+  background-color: rgba(10, 132, 255, 0.16);
+  border-radius: 8px;
+  padding-top: 2px;
+  padding-bottom: 2px;
+  padding-left: 8px;
+  padding-right: 8px;
+}
+
+.dots-row {
+  margin-top: 10px;
+  flex-direction: row;
+  align-items: center;
+}
+
+.mini-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 6px;
+  margin-right: 7px;
+}
+
+.day-count {
+  font-size: 20px;
+  color: rgba(235, 235, 245, 0.5);
+}
+
+.gap {
+  height: 10px;
+}
+
+/* 方屏适配：无弧形裁边，恢复常规边距 */
+@media screen and (device: watch-square) {
+  .content {
+    padding-left: 40px;
+    padding-right: 40px;
+    padding-top: 40px;
+    padding-bottom: 60px;
+  }
+}
+
+</style>

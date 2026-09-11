@@ -1,0 +1,365 @@
+<template>
+  <div class="page">
+    <scroll class="scroll" scroll-y="true">
+      <div class="content">
+        <text class="title">考试与假期</text>
+        <text class="subtitle">长按删除条目</text>
+
+        <div for="{{row in rows}}" tid="{{row.key}}">
+          <div class="row press" onlongpress="onRowDelete($idx)">
+            <div class="row-left">
+              <div class="kind-dot" style="background-color: {{row.color}};"></div>
+              <text class="row-name">{{row.name}}</text>
+              <text class="row-date">{{row.dateLabel}}</text>
+            </div>
+            <text class="row-days" style="color: {{row.color}};">{{row.daysLabel}}</text>
+          </div>
+        </div>
+
+        <div if="{{rows.length === 0}}" class="empty">
+          <text class="empty-txt">还没有倒计时，点下方添加</text>
+        </div>
+
+        <div class="seg">
+          <div class="seg-btn {{kind === 'exam' ? 'seg-on-exam' : ''}}" onclick="onKindExam">
+            <text class="seg-txt {{kind === 'exam' ? 'seg-txt-exam' : ''}}">考试</text>
+          </div>
+          <div class="seg-btn {{kind === 'holiday' ? 'seg-on-holiday' : ''}}" onclick="onKindHoliday">
+            <text class="seg-txt {{kind === 'holiday' ? 'seg-txt-holiday' : ''}}">假期</text>
+          </div>
+        </div>
+
+        <div class="editor">
+          <text class="ed-label">名称</text>
+          <picker class="ed-picker-s" type="text" range="{{nameRange}}" selected="{{nameSel}}" onchange="onNamePick"></picker>
+          <text class="ed-label">日期</text>
+          <picker class="ed-picker-s" type="date" start="2026-1-1" end="2030-12-31" selected="{{dateVal}}" onchange="onDatePick"></picker>
+          <div class="add-btn press" onclick="onAdd">
+            <text class="add-txt">添加{{kind === 'exam' ? '考试' : '假期'}}倒计时</text>
+          </div>
+        </div>
+
+        <div class="gap"></div>
+      </div>
+    </scroll>
+  </div>
+</template>
+
+<script>
+import sys from '../../helper/sys.js'
+import { load, getData, save } from '../../store/index.js'
+import { genId, EXAM_NAME_PRESETS, HOLIDAY_NAME_PRESETS } from '../../core/defaults.js'
+import { daysUntil } from '../../core/timetable.js'
+
+export default {
+  data: {
+    rows: [],
+    kind: 'exam',
+    nameRange: EXAM_NAME_PRESETS,
+    nameSel: 0,
+    dateVal: '2026-10-1',
+    pickedDate: ''
+  },
+
+  onInit() {
+    this._loaded = false
+  },
+
+  onReady() {
+    this._loaded = true
+    load()
+    this.refresh()
+  },
+
+  onShow() {
+    if (this._loaded) this.refresh()
+  },
+
+  refresh() {
+    if (!this._loaded) return
+    const st = getData()
+    if (!st) return
+    const now = new Date()
+    const rows = []
+    for (let i = 0; i < st.countdowns.length; i++) {
+      const c = st.countdowns[i]
+      const n = daysUntil(c.date, now)
+      const p = String(c.date).split('-')
+      rows.push({
+        key: c.id || (c.name + i),
+        id: c.id || (c.name + i),
+        name: c.name,
+        color: c.kind === 'exam' ? '#FF453A' : '#0A84FF',
+        dateLabel: parseInt(p[0], 10) + '.' + parseInt(p[1], 10) + '.' + parseInt(p[2], 10),
+        daysLabel: n < 0 ? '已过' : (n === 0 ? '今天' : n + ' 天')
+      })
+    }
+    rows.sort(function (a, b) { return 0 })
+    this.rows = rows
+  },
+
+  onKindExam() {
+    this.kind = 'exam'
+    this.nameRange = EXAM_NAME_PRESETS
+    this.nameSel = 0
+    sys.vibrateShort()
+  },
+
+  onKindHoliday() {
+    this.kind = 'holiday'
+    this.nameRange = HOLIDAY_NAME_PRESETS
+    this.nameSel = 0
+    sys.vibrateShort()
+  },
+
+  onNamePick(e) {
+    if (!e) return
+    for (let i = 0; i < this.nameRange.length; i++) {
+      if (this.nameRange[i] === e.newValue) { this.nameSel = i; break }
+    }
+  },
+
+  onDatePick(e) {
+    if (!e) return
+    const pad = function (n) { return n < 10 ? '0' + n : '' + n }
+    this.pickedDate = e.year + '-' + pad(e.month) + '-' + pad(e.day)
+    this.dateVal = e.year + '-' + e.month + '-' + e.day
+    this.dateLabel = e.year + '.' + e.month + '.' + e.day
+  },
+
+  onAdd() {
+    const st = getData()
+    if (!st) return
+    const name = this.nameRange[this.nameSel]
+    let date = this.pickedDate
+    if (!date) {
+      const t = new Date()
+      t.setDate(t.getDate() + 30)
+      const pad = function (n) { return n < 10 ? '0' + n : '' + n }
+      date = t.getFullYear() + '-' + pad(t.getMonth() + 1) + '-' + pad(t.getDate())
+    }
+    st.countdowns.push({ id: genId(), kind: this.kind, name: name, date: date })
+    save(st)
+    sys.vibrateShort()
+    sys.toast('已添加 ' + name)
+    this.refresh()
+  },
+
+  onRowDelete(idx) {
+    if (idx === undefined || !this.rows[idx]) return
+    const item = this.rows[idx]
+    const st = getData()
+    for (let i = st.countdowns.length - 1; i >= 0; i--) {
+      if ((st.countdowns[i].id || st.countdowns[i].name) === item.id) st.countdowns.splice(i, 1)
+    }
+    save(st)
+    sys.toast('已删除 ' + item.name)
+    this.refresh()
+  }
+}
+</script>
+
+<style>
+.page {
+  width: 466px;
+  height: 466px;
+  background-color: #000000;
+}
+
+.scroll {
+  width: 466px;
+  height: 466px;
+}
+
+.content {
+  width: 466px;
+  padding-left: 48px;
+  padding-right: 48px;
+  padding-top: 80px;
+  padding-bottom: 100px;
+  flex-direction: column;
+  align-items: center;
+}
+
+.title {
+  font-size: 34px;
+  font-weight: bold;
+  color: #ffffff;
+}
+
+.subtitle {
+  margin-top: 6px;
+  font-size: 18px;
+  color: rgba(235, 235, 245, 0.4);
+}
+
+.row {
+  margin-top: 12px;
+  width: 370px;
+  height: 72px;
+  justify-content: space-between;
+  border-radius: 20px;
+  border-width: 1px;
+  border-color: rgba(255, 255, 255, 0.07);
+  border-style: solid;
+  background: linear-gradient(to bottom right, #1d1d22, #141418);
+  flex-direction: row;
+  align-items: center;
+  padding-left: 22px;
+  padding-right: 22px;
+}
+
+.kind-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 6px;
+  margin-right: 12px;
+}
+
+.row-name {
+  font-size: 23px;
+  font-weight: bold;
+  color: #ffffff;
+}
+
+.row-date {
+  margin-left: 12px;
+  font-size: 18px;
+  color: rgba(235, 235, 245, 0.45);
+}
+
+.row-days {
+  font-size: 20px;
+  font-weight: bold;
+}
+
+.row-left {
+  flex-direction: row;
+  align-items: center;
+}
+
+.empty {
+  margin-top: 20px;
+  height: 60px;
+  justify-content: center;
+}
+
+.empty-txt {
+  font-size: 18px;
+  color: rgba(235, 235, 245, 0.35);
+}
+
+.seg {
+  margin-top: 20px;
+  width: 370px;
+  height: 52px;
+  border-radius: 26px;
+  background-color: #1c1c1e;
+  flex-direction: row;
+  align-items: center;
+  padding-left: 6px;
+  padding-right: 6px;
+}
+
+.seg-btn {
+  flex-grow: 0;
+  width: 179px;
+  height: 40px;
+  border-radius: 20px;
+  justify-content: center;
+  align-items: center;
+  margin-left: 1px;
+  margin-right: 1px;
+}
+
+.seg-on-exam {
+  background-color: rgba(255, 69, 58, 0.2);
+}
+
+.seg-on-holiday {
+  background-color: rgba(10, 132, 255, 0.2);
+}
+
+.seg-txt {
+  font-size: 20px;
+  color: rgba(235, 235, 245, 0.55);
+}
+
+.seg-txt-exam {
+  color: #FF453A;
+  font-weight: bold;
+}
+
+.seg-txt-holiday {
+  color: #0A84FF;
+  font-weight: bold;
+}
+
+.editor {
+  margin-top: 16px;
+  width: 370px;
+  border-width: 1px;
+  border-color: rgba(255, 255, 255, 0.08);
+  border-style: solid;
+  background-color: #101014;
+  border-radius: 24px;
+  flex-direction: column;
+  align-items: center;
+  padding-top: 16px;
+  padding-bottom: 18px;
+}
+
+.ed-label {
+  margin-top: 6px;
+  font-size: 19px;
+  color: rgba(235, 235, 245, 0.5);
+}
+
+.ed-picker-s {
+  width: 300px;
+  height: 130px;
+  margin-top: 4px;
+  font-size: 20px;
+  color: rgba(235, 235, 245, 0.4);
+  selected-font-size: 28px;
+  selected-color: #ffffff;
+  selected-background-color: rgba(255, 255, 255, 0.08);
+  linecolor: #26262c;
+}
+
+.add-btn {
+  margin-top: 12px;
+  height: 52px;
+  border-radius: 26px;
+  background-color: #0A84FF;
+  justify-content: center;
+  align-items: center;
+  padding-left: 30px;
+  padding-right: 30px;
+}
+
+.add-txt {
+  font-size: 20px;
+  font-weight: bold;
+  color: #ffffff;
+}
+
+.gap {
+  height: 10px;
+}
+
+.press:active {
+  opacity: 0.72;
+}
+
+/* 方屏适配：无弧形裁边，恢复常规边距 */
+@media screen and (device: watch-square) {
+  .content {
+    padding-left: 40px;
+    padding-right: 40px;
+    padding-top: 40px;
+    padding-bottom: 60px;
+  }
+}
+
+</style>

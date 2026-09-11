@@ -1,0 +1,849 @@
+<template>
+  <div class="page">
+    <scroll class="scroll" scroll-y="true">
+      <div class="content">
+
+        <!-- 顶部：周次信息，点击进周视图 -->
+        <div class="header press" onclick="openWeek">
+          <text class="week-line">{{ weekLabel }}</text>
+          <text class="date-line">{{ dateLabel }}</text>
+        </div>
+
+        <!-- 主卡：当前/下一节倒计时 -->
+        <div class="hero press" onclick="onHeroTap">
+          <progress if="{{ ringShow }}" class="ring" type="circular" percent="{{ ringPct }}"
+            style="color: {{ ringColor }}; stroke-width: 9px; layer-color: #1d1d22; left: 100px; top: 45px; width: 170px; height: 170px; position: absolute;"></progress>
+          <div class="hero-info">
+            <text class="hero-status">{{ heroStatus }}</text>
+            <text class="hero-main">{{ heroMain }}</text>
+            <text if="{{ heroTime !== '' }}" class="hero-time" style="font-size: {{ heroTime.length >= 7 ? '42px' : '56px' }};">{{ heroTime }}</text>
+            <text if="{{ heroSub !== '' }}" class="hero-sub">{{ heroSub }}</text>
+          </div>
+        </div>
+
+        <!-- 星期切换 -->
+        <div class="chips">
+          <div for="{{chip in dayChips}}" tid="{{chip.key}}" class="chip {{chip.selected ? 'chip-on' : ''}} {{chip.isToday && !chip.selected ? 'chip-today' : ''}}"
+            onclick="onDayTap($idx)">
+            <text class="chip-txt {{chip.selected ? 'chip-txt-on' : ''}} {{chip.isToday && !chip.selected ? 'chip-txt-today' : ''}}">{{chip.label}}</text>
+          </div>
+        </div>
+
+        <!-- 倒计时胶囊 -->
+        <scroll if="{{chips.length > 0}}" class="cd-scroll" scroll-x="true">
+          <div class="cd-row">
+            <div for="{{cd in chips}}" tid="{{cd.id}}" class="cd-pill press" style="background-color: {{cd.bg}};" onclick="goCountdowns">
+              <text class="cd-txt" style="color: {{cd.fg}};">{{cd.label}}</text>
+            </div>
+          </div>
+        </scroll>
+
+        <!-- 当日课程列表 -->
+        <div class="list">
+          <div class="list-head">
+            <text class="list-title">今日课程</text>
+            <div class="list-actions">
+              <div class="act-btn press" onclick="goEdit">
+                <text class="act-txt">编辑课表</text>
+              </div>
+              <div class="act-btn act-setup press" onclick="goSettings">
+                <text class="act-txt act-txt-setup">设置</text>
+              </div>
+            </div>
+          </div>
+          <div for="{{row in rows}}" tid="{{row.key}}">
+            <div if="{{row.kind === 'break'}}" class="break-row">
+              <text class="break-txt">{{row.name}}  {{row.time}}</text>
+            </div>
+            <div elif="{{row.kind === 'free'}}" class="free-row press" onclick="goEdit">
+              <text class="free-time">{{row.start}} - {{row.end}}</text>
+              <text class="free-name">未设置 · 点击填写</text>
+            </div>
+            <div else class="course-row press {{row.cur ? 'row-cur' : ''}}" onlongpress="goEdit">
+              <div class="time-col">
+                <text class="time-start {{row.cur ? 'time-start-cur' : ''}}">{{row.start}}</text>
+                <text class="time-end">{{row.end}}</text>
+              </div>
+              <div class="divider"></div>
+              <div class="info-col">
+                <div class="subj-line">
+                  <div class="dot" style="background-color: {{row.color}};"></div>
+                  <text class="subj-name">{{row.subjectName}}</text>
+                </div>
+                <text class="period-name">{{row.periodName}}</text>
+              </div>
+            </div>
+          </div>
+
+          <div if="{{rows.length === 0}}" class="empty">
+            <text class="empty-txt">暂无作息数据，点右上「设置」添加</text>
+          </div>
+        </div>
+
+      </div>
+    </scroll>
+  </div>
+</template>
+
+<script>
+import sys from '../../helper/sys.js'
+import { load, getData } from '../../store/index.js'
+import { WEEKDAY_ZH, WEEKDAY_SHORT } from '../../core/defaults.js'
+import { weekNumberOf, currentPeriod, formatRemain, holidayAt, daysUntil } from '../../core/timetable.js'
+
+const PAGE_HEIGHT = 466
+
+export default {
+  data: {
+    weekLabel: '',
+    dateLabel: '',
+    dayChips: [],
+    selDay: -1,
+    todayIdx: -1,
+    heroStatus: '',
+    heroMain: '',
+    heroTime: '',
+    heroSub: '',
+    ringShow: false,
+    ringPct: 0,
+    ringColor: '#0A84FF',
+    heroTapMode: '',
+    rows: [],
+    chips: [],
+    timer: 0,
+    liveSig: ''
+  },
+
+  onInit() {
+    this._loaded = false
+  },
+
+  onReady() {
+    this._loaded = true
+    this.refresh()
+    this.startTimer()
+  },
+
+  onRefresh(query) {
+    // singleTask：从周视图点选某天跳回时携带 day（0..6，字符串）
+    if (query && query.day !== undefined && query.day !== '') {
+      const d = parseInt(query.day, 10)
+      if (!isNaN(d) && d >= 0 && d <= 6) this.selDay = d
+    }
+    if (this._loaded) this.refresh()
+  },
+
+  onShow() {
+    this.startTimer()
+    if (this._loaded) this.refresh()
+  },
+
+  onHide() {
+    this.stopTimer()
+  },
+
+  onDestroy() {
+    this.stopTimer()
+  },
+
+  startTimer() {
+    if (this.timer) return
+    const self = this
+    this.timer = setInterval(function () { self.tick() }, 1000)
+  },
+
+  stopTimer() {
+    if (this.timer) {
+      clearInterval(this.timer)
+      this.timer = 0
+    }
+  },
+
+  /** 每秒轻量刷新：只更新倒计时文本与进度环；状态切换时才全量重建 */
+  tick() {
+    const st = getData()
+    if (!st) return
+    const now = new Date()
+    const live = currentPeriod(st.periods, now)
+    const sig = live.state + ':' + (live.period ? live.period.id : '') + ':' + (live.nextPeriod ? live.nextPeriod.id : '')
+    if (sig !== this.liveSig) {
+      this.refresh()
+      return
+    }
+    if (this.selDay === this.todayIdx && (live.state === 'in' || live.state === 'between')) {
+      this.heroTime = formatRemain(live.remainSec)
+      if (live.state === 'in' && live.totalSec > 0) {
+        const done = live.totalSec - live.remainSec
+        this.ringPct = Math.round((done / live.totalSec) * 100)
+      }
+    }
+  },
+
+  refresh() {
+    if (!this._loaded) return
+    const st = getData()
+    if (!st) return
+    const now = new Date()
+    const today = (now.getDay() + 6) % 7
+    this.todayIdx = today
+    if (this.selDay < 0) this.selDay = today
+    const weekNo = weekNumberOf(st.semesterStart, now)
+
+    this.weekLabel = weekNo >= 1 ? '第 ' + weekNo + ' 周' : '未开学'
+
+    // 星期芯片
+    const chips = []
+    for (let i = 0; i < 7; i++) {
+      chips.push({
+        key: 'd' + i,
+        dayIdx: i,
+        label: WEEKDAY_SHORT[i],
+        selected: i === this.selDay,
+        isToday: i === today
+      })
+    }
+    this.dayChips = chips
+
+    // 周内日期标签（以本周一为基准）
+    const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+    monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7))
+    const selDate = new Date(monday.getTime())
+    selDate.setDate(selDate.getDate() + this.selDay)
+    this.dateLabel = (selDate.getMonth() + 1) + '月' + selDate.getDate() + '日 ' + WEEKDAY_ZH[this.selDay]
+
+    // 倒计时胶囊：考试与未开始的假期
+    const pills = []
+    const cds = st.countdowns || []
+    for (let i = 0; i < cds.length; i++) {
+      const c = cds[i]
+      const n = daysUntil(c.date, now)
+      if (n < 0) continue
+      if (c.kind === 'holiday' && holidayAt(cds, now)) continue
+      pills.push({
+        id: c.id || (c.name + i),
+        label: (n === 0 ? c.name + ' · 今天' : c.name + ' ' + n + ' 天'),
+        bg: c.kind === 'holiday' ? '#0A84FF26' : '#FF453A26',
+        fg: c.kind === 'holiday' ? '#0A84FF' : '#FF453A'
+      })
+    }
+    this.chips = pills
+
+    // 课程列表 + 主卡
+    this.rows = this.buildRows(st, now, this.selDay)
+    this.buildHero(st, now, this.selDay, weekNo)
+  },
+
+  buildRows(st, now, day) {
+    const subjMap = {}
+    for (let i = 0; i < st.subjects.length; i++) subjMap[st.subjects[i].id] = st.subjects[i]
+    const periods = (st.periods || []).slice().sort(function (a, b) { return a.start < b.start ? -1 : 1 })
+    const dayCourses = (st.courses && st.courses[String(day + 1)]) || []
+    const rows = []
+    for (let i = 0; i < periods.length; i++) {
+      const p = periods[i]
+      if (p.type === 'break') {
+        rows.push({ key: 'b-' + p.id, kind: 'break', name: p.name, time: p.start + ' - ' + p.end, cur: false, periodId: '', start: p.start, end: p.end, color: '', subjectName: '', tag: '', periodName: p.name })
+        continue
+      }
+      const entries = []
+      for (let j = 0; j < dayCourses.length; j++) {
+        const c = dayCourses[j]
+        if (c && c.periodId === p.id) {
+          entries.push(c)
+        }
+      }
+      if (entries.length === 0) {
+        rows.push({ key: 'f-' + p.id, kind: 'free', name: '', time: '', periodName: p.name, start: p.start, end: p.end, cur: false, periodId: p.id, color: '', subjectName: '', tag: '' })
+        continue
+      }
+      for (let j = 0; j < entries.length; j++) {
+        const c = entries[j]
+        const subj = subjMap[c.subjectId] || { name: '未知科目', color: '#8E8E93' }
+        rows.push({
+          key: 'c-' + p.id + '-' + j,
+          kind: 'course',
+          periodId: p.id,
+          periodName: p.name,
+          start: p.start,
+          end: p.end,
+          subjectName: subj.name,
+          color: subj.color,
+          tag: '',
+          cur: false,
+          name: '',
+          time: ''
+        })
+      }
+    }
+    // 标记进行中的一节
+    if (day === this.todayIdx) {
+      const live = currentPeriod(st.periods, now)
+      if (live.state === 'in' && live.period && live.period.type === 'class') {
+        for (let i = 0; i < rows.length; i++) {
+          if (rows[i].periodId === live.period.id) rows[i].cur = true
+        }
+      }
+    }
+    return rows
+  },
+
+  subjectOf(st, subjectId) {
+    for (let i = 0; i < st.subjects.length; i++) {
+      if (st.subjects[i].id === subjectId) return st.subjects[i]
+    }
+    return null
+  },
+
+  visibleEntryForPeriod(st, day, periodId) {
+    const list = (st.courses && st.courses[String(day + 1)]) || []
+    for (let i = 0; i < list.length; i++) {
+      const c = list[i]
+      if (c && c.periodId === periodId) return c
+    }
+    return null
+  },
+
+  buildHero(st, now, day, weekNo) {
+    if (weekNo < 1) {
+      this.heroStatus = '还未开学'
+      this.heroMain = '好好休息'
+      this.heroTime = ''
+      this.heroSub = '点击「设置」选学期起始日'
+      this.ringShow = false
+      this.ringPct = 0
+      this.heroTapMode = "settings"
+      return
+    }
+    if (day !== this.todayIdx) {
+      const count = this.countCourseRows(this.rows)
+      this.heroStatus = WEEKDAY_ZH[day]
+      this.heroTime = ''
+      this.heroTapMode = ""
+      this.ringShow = false
+      if (count === 0) {
+        this.heroMain = '无课程'
+        this.heroSub = ''
+      } else {
+        const first = this.firstCourseRow(this.rows)
+        this.heroMain = count + ' 节课'
+        this.heroSub = first ? ('首节 ' + first.start + ' · ' + first.subjectName) : ''
+      }
+      return
+    }
+    const live = currentPeriod(st.periods, now)
+    this.liveSig = live.state + ':' + (live.period ? live.period.id : '') + ':' + (live.nextPeriod ? live.nextPeriod.id : '')
+    const hasCourse = this.countCourseRows(this.rows) > 0
+    if (live.state === 'after' || live.state === 'none' || !st.periods.length) {
+      this.ringShow = true
+      this.ringPct = 100
+      this.ringColor = '#3A3A40'
+      this.heroTime = ''
+      this.heroTapMode = ""
+      if (!hasCourse) {
+        this.heroStatus = '今日无课'
+        this.heroMain = '开始排课'
+        this.heroSub = '点击去编辑课表'
+        this.heroTapMode = "edit"
+      } else {
+        this.heroStatus = '今日课程'
+        this.heroMain = '已结束'
+        this.heroSub = '好好休息'
+      }
+      return
+    }
+    if (live.state === 'in' && live.period.type === 'class') {
+      const entry = this.visibleEntryForPeriod(st, day, live.period.id)
+      const subj = entry ? this.subjectOf(st, entry.subjectId) : null
+      this.ringShow = true
+      this.ringColor = subj ? subj.color : '#0A84FF'
+      this.ringPct = live.totalSec > 0 ? Math.round(((live.totalSec - live.remainSec) / live.totalSec) * 100) : 0
+      this.heroStatus = '正在上课 · ' + live.period.name
+      this.heroMain = subj ? subj.name : '自由安排'
+      this.heroTime = formatRemain(live.remainSec)
+      this.heroSub = '距下课'
+      this.heroTapMode = ""
+      return
+    }
+    if (live.state === 'in') {
+      // 正处于休息时段（午休/大课间等）
+      const nc = this.nextClassAfter(st, now)
+      this.ringShow = true
+      this.ringColor = '#48484A'
+      this.ringPct = live.totalSec > 0 ? Math.round(((live.totalSec - live.remainSec) / live.totalSec) * 100) : 0
+      this.heroStatus = live.period.name
+      this.heroTime = formatRemain(live.remainSec)
+      if (nc) {
+        const entry = this.visibleEntryForPeriod(st, day, nc.id)
+        const subj = entry ? this.subjectOf(st, entry.subjectId) : null
+        this.heroMain = subj ? subj.name : nc.name
+        this.heroSub = '距 ' + nc.name
+      } else {
+        this.heroMain = '休息中'
+        this.heroSub = ''
+      }
+      this.heroTapMode = ""
+      return
+    }
+    // between：课间或未开始
+    const nc2 = this.nextClassAfter(st, now)
+    this.ringShow = true
+    this.ringColor = '#0A84FF'
+    this.ringPct = 0
+    this.heroTapMode = ""
+    this.heroTime = formatRemain(live.remainSec)
+    if (nc2) {
+      const entry2 = this.visibleEntryForPeriod(st, day, nc2.id)
+      const subj2 = entry2 ? this.subjectOf(st, entry2.subjectId) : null
+      this.heroStatus = '即将开始'
+      this.heroMain = subj2 ? subj2.name : nc2.name
+      this.heroSub = '距 ' + nc2.name
+    } else {
+      this.heroStatus = '课间'
+      this.heroMain = '自由时光'
+      this.heroSub = ''
+    }
+  },
+
+  nextClassAfter(st, now) {
+    const periods = (st.periods || []).slice().sort(function (a, b) { return a.start < b.start ? -1 : 1 })
+    const nowMin = now.getHours() * 60 + now.getMinutes()
+    const toMin = function (hm) {
+      const p = String(hm).split(':')
+      return parseInt(p[0], 10) * 60 + parseInt(p[1], 10)
+    }
+    for (let i = 0; i < periods.length; i++) {
+      const p = periods[i]
+      if (p.type === 'class' && nowMin < toMin(p.start)) return p
+    }
+    return null
+  },
+
+  countCourseRows(rows) {
+    let n = 0
+    for (let i = 0; i < rows.length; i++) if (rows[i].kind === 'course') n++
+    return n
+  },
+
+  firstCourseRow(rows) {
+    for (let i = 0; i < rows.length; i++) if (rows[i].kind === 'course') return rows[i]
+    return null
+  },
+
+  openWeek() {
+    sys.vibrateShort()
+    sys.router().push({ uri: '/pages/Week' })
+  },
+
+  goEdit() {
+    sys.vibrateShort()
+    sys.router().push({ uri: '/pages/Edit' })
+  },
+
+  goSettings() {
+    sys.vibrateShort()
+    sys.router().push({ uri: '/pages/Settings' })
+  },
+
+  goCountdowns() {
+    sys.router().push({ uri: '/pages/Countdowns' })
+  },
+
+  onHeroTap() {
+    if (this.heroTapMode === "edit") this.goEdit()
+    else if (this.heroTapMode === "settings") this.goSettings()
+  },
+
+  onDayTap(idx) {
+    if (idx === undefined || !this.dayChips[idx]) return
+    this.selDay = this.dayChips[idx].dayIdx
+    sys.vibrateShort()
+    this.refresh()
+  }
+}
+</script>
+
+<style>
+@keyframes rise {
+  0% { opacity: 0; transform: translateY(18px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+.page {
+  width: 466px;
+  height: 466px;
+  background-color: #000000;
+}
+
+.scroll {
+  width: 466px;
+  height: 466px;
+}
+
+.content {
+  width: 466px;
+  padding-left: 48px;
+  padding-right: 48px;
+  padding-top: 86px;
+  padding-bottom: 116px;
+  flex-direction: column;
+  align-items: center;
+}
+
+.header {
+  width: 370px;
+  height: 84px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.week-line {
+  font-size: 30px;
+  font-weight: bold;
+  color: #ffffff;
+}
+
+.date-line {
+  margin-top: 6px;
+  font-size: 21px;
+  color: rgba(235, 235, 245, 0.55);
+}
+
+.hero {
+  margin-top: 14px;
+  width: 370px;
+  height: 250px;
+  position: relative;
+  border-radius: 36px;
+  border-width: 1px;
+  border-color: rgba(255, 255, 255, 0.09);
+  border-style: solid;
+  background: linear-gradient(to bottom right, #232329, #151519);
+  animation-name: rise;
+  animation-duration: 340ms;
+  animation-timing-function: ease-out;
+  animation-fill-mode: forwards;
+}
+
+.hero-info {
+  position: absolute;
+  left: 60px;
+  top: 40px;
+  width: 250px;
+  height: 180px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.hero-status {
+  font-size: 20px;
+  color: rgba(235, 235, 245, 0.55);
+  lines: 1;
+  text-overflow: ellipsis;
+}
+
+.hero-main {
+  margin-top: 8px;
+  font-size: 40px;
+  font-weight: bold;
+  color: #ffffff;
+  lines: 1;
+  text-overflow: ellipsis;
+}
+
+.hero-time {
+  margin-top: 2px;
+  font-size: 56px;
+  font-weight: bold;
+  color: #ffffff;
+}
+
+.hero-sub {
+  margin-top: 4px;
+  font-size: 20px;
+  color: rgba(235, 235, 245, 0.55);
+  lines: 1;
+  text-overflow: ellipsis;
+}
+
+.chips {
+  margin-top: 22px;
+  width: 370px;
+  height: 56px;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.chip {
+  width: 44px;
+  height: 44px;
+  border-radius: 22px;
+  background-color: #1c1c1e;
+  border-width: 1px;
+  border-color: rgba(255, 255, 255, 0.08);
+  border-style: solid;
+  justify-content: center;
+  align-items: center;
+}
+
+.chip-txt {
+  font-size: 22px;
+  color: rgba(235, 235, 245, 0.75);
+}
+
+.chip-on {
+  background-color: #ffffff;
+  border-color: #ffffff;
+}
+
+.chip-txt-on {
+  color: #000000;
+  font-weight: bold;
+}
+
+.chip-today {
+  border-color: rgba(10, 132, 255, 0.85);
+}
+
+.chip-txt-today {
+  color: #0A84FF;
+}
+
+.cd-scroll {
+  margin-top: 18px;
+  width: 370px;
+  height: 52px;
+}
+
+.cd-row {
+  flex-direction: row;
+  align-items: center;
+}
+
+.cd-pill {
+  height: 44px;
+  border-radius: 22px;
+  padding-left: 18px;
+  padding-right: 18px;
+  margin-right: 12px;
+  justify-content: center;
+  align-items: center;
+}
+
+.cd-txt {
+  font-size: 20px;
+  font-weight: bold;
+}
+
+.list {
+  margin-top: 18px;
+  width: 370px;
+  flex-direction: column;
+}
+
+.list-head {
+  width: 370px;
+  height: 44px;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.list-title {
+  font-size: 20px;
+  color: rgba(235, 235, 245, 0.55);
+}
+
+.list-actions {
+  flex-direction: row;
+  align-items: center;
+}
+
+.act-btn {
+  height: 38px;
+  border-radius: 19px;
+  border-width: 1px;
+  border-color: rgba(10, 132, 255, 0.55);
+  border-style: solid;
+  background-color: rgba(10, 132, 255, 0.14);
+  justify-content: center;
+  align-items: center;
+  padding-left: 14px;
+  padding-right: 14px;
+}
+
+.act-txt {
+  font-size: 18px;
+  font-weight: bold;
+  color: #0A84FF;
+}
+
+.act-setup {
+  margin-left: 10px;
+  border-color: rgba(255, 255, 255, 0.16);
+  border-style: solid;
+  background-color: #1c1c1e;
+}
+
+.act-txt-setup {
+  color: rgba(235, 235, 245, 0.75);
+  font-weight: normal;
+}
+
+.course-row {
+  width: 370px;
+  height: 84px;
+  border-radius: 24px;
+  border-width: 1px;
+  border-color: rgba(255, 255, 255, 0.07);
+  border-style: solid;
+  background: linear-gradient(to bottom right, #1d1d22, #141418);
+  margin-bottom: 10px;
+  flex-direction: row;
+  align-items: center;
+  padding-left: 22px;
+  padding-right: 22px;
+}
+
+.row-cur {
+  border-color: rgba(255, 255, 255, 0.38);
+  background: linear-gradient(to bottom right, #2c2c33, #191920);
+}
+
+.time-col {
+  width: 86px;
+  flex-direction: column;
+}
+
+.time-start {
+  lines: 1;
+  font-size: 25px;
+  font-weight: bold;
+  color: #ffffff;
+}
+
+.time-start-cur {
+  color: #0A84FF;
+}
+
+.time-end {
+  margin-top: 4px;
+  font-size: 17px;
+  color: rgba(235, 235, 245, 0.4);
+}
+
+.divider {
+  width: 1px;
+  height: 44px;
+  margin-left: 18px;
+  margin-right: 18px;
+  background-color: rgba(255, 255, 255, 0.12);
+}
+
+.info-col {
+  flex-direction: column;
+}
+
+.subj-line {
+  flex-direction: row;
+  align-items: center;
+}
+
+.dot {
+  width: 13px;
+  height: 13px;
+  border-radius: 7px;
+  margin-right: 10px;
+}
+
+.subj-name {
+  font-size: 27px;
+  font-weight: bold;
+  color: #ffffff;
+}
+
+.period-name {
+  margin-top: 4px;
+  font-size: 17px;
+  color: rgba(235, 235, 245, 0.4);
+}
+
+.break-row {
+  width: 370px;
+  height: 44px;
+  justify-content: center;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.break-txt {
+  font-size: 17px;
+  color: rgba(235, 235, 245, 0.35);
+}
+
+.free-row {
+  width: 370px;
+  height: 60px;
+  border-radius: 18px;
+  border-width: 1px;
+  border-color: rgba(255, 255, 255, 0.05);
+  border-style: solid;
+  background-color: #131316;
+  margin-bottom: 10px;
+  flex-direction: row;
+  align-items: center;
+  padding-left: 22px;
+  padding-right: 22px;
+}
+
+.free-time {
+  font-size: 19px;
+  color: rgba(235, 235, 245, 0.45);
+}
+
+.free-name {
+  margin-left: 14px;
+  font-size: 19px;
+  color: rgba(235, 235, 245, 0.25);
+}
+
+.empty {
+  width: 370px;
+  height: 90px;
+  justify-content: center;
+  align-items: center;
+}
+
+.empty-txt {
+  font-size: 20px;
+  color: rgba(235, 235, 245, 0.35);
+}
+
+.press:active {
+  opacity: 0.72;
+}
+
+/* 方屏适配：无弧形裁边，恢复常规边距，内容加宽 */
+@media screen and (device: watch-square) {
+  .content {
+    padding-left: 40px;
+    padding-right: 40px;
+    padding-top: 40px;
+    padding-bottom: 60px;
+  }
+  .header,
+  .hero,
+  .chips,
+  .cd-scroll,
+  .list,
+  .list-head,
+  .course-row,
+  .free-row,
+  .break-row {
+    width: 386px;
+  }
+}
+</style>
